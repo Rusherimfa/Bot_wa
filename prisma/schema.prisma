@@ -1,0 +1,8 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+model User { jid String @id; name String?; xp Int @default(0); level Int @default(1); balance Int @default(0) }
+model Score { id Int @id @default(autoincrement()); jid String; game String; points Int @default(0); createdAt DateTime @default(now()) }
+model GroupSetting { jid String @id; welcome Boolean @default(false); antilink Boolean @default(false) }
+model Product { id Int @id @default(autoincrement()); name String; price Int; stock Int @default(0) }
+model Order { id Int @id @default(autoincrement()); customer String; items Json; total Int; status String @default("pending"); createdAt DateTime @default(now()) }

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Snake - WA Bot Full</title>
+<style>
+  body{margin:0;background:#0f172a;color:#e2e8f0;font-family:system-ui,sans-serif;text-align:center}
+  h2{margin:12px 0 4px}#score{color:#4ade80;font-weight:700}
+  canvas{background:#1e293b;border-radius:12px;touch-action:none;max-width:94vw}
+  #pad{display:grid;grid-template-columns:repeat(3,64px);gap:6px;justify-content:center;margin:12px}
+  #pad button{background:#334155;color:#fff;border:0;border-radius:10px;font-size:22px;padding:12px}
+  #over{color:#f87171;font-weight:700}
+</style>
+</head>
+<body>
+<h2>SNAKE</h2>
+<div>Skor: <span id="score">0</span> <span id="over"></span></div>
+<div style="margin:8px">
+<span id="msg" style="font-size:13px"></span></div>
+<canvas id="c" width="360" height="360"></canvas>
+<div id="pad">
+  <span></span><button data-d="up">▲</button><span></span>
+  <button data-d="left">◀</button><button data-d="down">▼</button><button data-d="right">▶</button>
+</div>
+<script>
+const KEY=(function(){try{return new URLSearchParams(location.search).get('key')||'';}catch(e){return '';}})();
+const store=(function(){
+  function ls(){try{if(typeof localStorage==='undefined')return null;localStorage.setItem('__t','1');if(localStorage.getItem('__t')!=='1')return null;localStorage.removeItem('__t');return localStorage;}catch(e){return null;}}
+  const L=ls();const mem={};let wn=null;
+  try{wn=JSON.parse(window.name||'{}');if(!wn||typeof wn!=='object'||Array.isArray(wn))wn={};}catch(e){wn={};}
+  function saveWn(){try{window.name=JSON.stringify(wn);}catch(e){}}
+  return{
+    get:function(k){try{if(L){const v=L.getItem(k);if(v!==null&&v!==undefined)return v;}}catch(e){} if(wn&&k in wn)return wn[k]; return (k in mem)?mem[k]:null;},
+    set:function(k,v){try{if(L){L.setItem(k,v);return;}}catch(e){} try{wn[k]=v;saveWn();}catch(e2){mem[k]=v;}}
+  };
+})();
+const PTOK='__PTOK__';
+const c=document.getElementById('c'),x=c.getContext('2d'),N=18,S=20;
+let s,f,d,q,sc,run=true,best=+(store.get('snakeBest')||0)||0;
+function reset(){s=[{x:9,y:9}];d={x:1,y:0};q=[];sc=0;run=true;over.textContent='';food();loop();}
+function food(){f={x:Math.floor(Math.random()*N),y:Math.floor(Math.random()*N)};}
+function loop(){
+  if(!run)return;
+  if(q.length)d=q.shift();
+  const h={x:s[0].x+d.x,y:s[0].y+d.y};
+  if(h.x<0||h.y<0||h.x>=N||h.y>=N||s.some(p=>p.x===h.x&&p.y===h.y)){run=false;best=Math.max(best,sc);store.set('snakeBest',best);over.textContent='GAME OVER (terbaik: '+best+') - sentuh layar untuk ulangi';return;}
+  s.unshift(h);
+  if(h.x===f.x&&h.y===f.y){sc++;score.textContent=sc;food();}else s.pop();
+  x.fillStyle='#1e293b';x.fillRect(0,0,c.width,c.height);
+  x.fillStyle='#f87171';x.fillRect(f.x*S+2,f.y*S+2,S-4,S-4);
+  x.fillStyle='#4ade80';s.forEach((p,i)=>x.fillRect(p.x*S+1,p.y*S+1,S-2,S-2));
+  setTimeout(loop,120);
+}
+function dir(v){const l=q.length?q[q.length-1]:d;if(v.x!==-l.x||v.y!==-l.y)q.push(v);}
+const M={up:{x:0,y:-1},down:{x:0,y:1},left:{x:-1,y:0},right:{x:1,y:0}};
+document.querySelectorAll('#pad button').forEach(b=>b.onclick=()=>dir(M[b.dataset.d]));
+addEventListener('keydown',e=>{const k={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right'}[e.key];if(k)dir(M[k]);});
+c.onclick=()=>{if(!run)reset();};
+let tx,ty;
+c.ontouchstart=e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY;};
+c.ontouchend=e=>{const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;
+  dir(Math.abs(dx)>Math.abs(dy)?(dx>0?M.right:M.left):(dy>0?M.down:M.up));};
+reset();
+</script>
+</body>
+</html>

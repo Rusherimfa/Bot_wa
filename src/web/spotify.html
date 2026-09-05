@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Spotify Player</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+body{margin:0;background:#121212;color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:18px 14px}
+.cover{width:220px;height:220px;max-width:70vw;margin:6px auto;border-radius:12px;background:linear-gradient(135deg,#1db954,#191414);display:flex;align-items:center;justify-content:center;font-size:88px;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+h2{margin:12px 0 2px;font-size:20px}
+.artist{color:#b3b3b3;font-size:14px;margin-bottom:4px}
+.tag{display:inline-block;background:#1db954;color:#000;font-size:11px;font-weight:800;border-radius:10px;padding:2px 10px;margin-bottom:10px}
+#barwrap{background:#4d4d4d;border-radius:6px;height:6px;margin:14px 4px 4px;position:relative}
+#bar{background:#1db954;border-radius:6px;height:6px;width:0%}
+#times{display:flex;justify-content:space-between;font-size:12px;color:#b3b3b3}
+#play{width:76px;height:76px;border-radius:50%;background:#1db954;border:0;color:#000;font-size:30px;font-weight:900;margin:12px auto;display:block}
+.hint{font-size:11px;color:#666}
+</style>
+</head>
+<body>
+<div class="cover">🎵</div>
+<h2>__TITLE__</h2>
+<div class="artist">__ARTIST__</div>
+<div class="tag">PREVIEW 60 DETIK</div>
+<div id="barwrap"><div id="bar"></div></div>
+<div id="times"><span id="cur">0:00</span><span id="dur">1:00</span></div>
+<button id="play">▶</button>
+<div class="hint">Ketuk putar untuk mendengarkan</div>
+<script>
+const AUD='__AUDIO_B64__';
+const DUR=__DUR__;
+const audio=new Audio('data:audio/mpeg;base64,'+AUD);
+const btn=document.getElementById('play'),bar=document.getElementById('bar'),cur=document.getElementById('cur');
+function fmt(s){s=Math.floor(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+document.getElementById('dur').textContent=fmt(DUR);
+btn.onclick=()=>{if(audio.paused){audio.play().catch(()=>{});btn.textContent='⏸';}else{audio.pause();btn.textContent='▶';}};
+audio.ontimeupdate=()=>{bar.style.width=(100*audio.currentTime/(audio.duration||DUR))+'%';cur.textContent=fmt(audio.currentTime);};
+audio.onended=()=>{btn.textContent='▶';bar.style.width='0%';cur.textContent='0:00';};
+</script>
+</body>
+</html>

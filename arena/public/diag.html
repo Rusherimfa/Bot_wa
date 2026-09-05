@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="id">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Diagnostik Jalur</title>
+<style>body{font-family:system-ui;background:#14231a;color:#efe7d8;padding:16px;font-size:14px} .ok{color:#4ade80} .no{color:#f87171} .r{margin:5px 0} button{background:#7c4a32;color:#fff;border:0;border-radius:8px;padding:10px 16px;font-weight:700;margin-top:8px} small{color:#94a3b8}</style>
+</head>
+<body>
+<h2>Tes Jalur Network</h2>
+<div class="r">Dibuat: __BUILT_AT__ (minta yang baru bila basi)</div>
+<div class="r">Server dites: __DIAG_BASE__</div>
+<div class="r">7. Ketuk link: <a id="lnk1" href="https://example.com/">buka example.com</a> | <a id="lnk2" href="https://wa.me/?text=tes">buka wa.me</a> <small>(lapor: pindah halaman / tidak terjadi apa-apa)</small></div>
+<div id="out"><div class="r">Menyiapkan...</div></div>
+<button id="re">TES LAGI</button>
+<script>
+const BASE='__DIAG_BASE__';
+const VIOL=[];
+try{
+  document.addEventListener('securitypolicyviolation',function(e){
+    try{VIOL.push((e.violatedDirective||'?')+' -> '+(e.blockedURI||'?'));}catch(x){}
+  });
+}catch(e){}
+function row(n,t,ok,det){return '<div class="r">'+n+'. '+t+': <span class="'+(ok?'ok':'no')+'">'+(ok?'OK':'GAGAL')+'</span>'+(det?' <small>'+det+'</small>':'')+'</div>';}
+async function tfetch(url,ms){
+  const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
+  const to=setTimeout(function(){try{ctl&&ctl.abort();}catch(e){}},ms||8000);
+  try{
+    const r=await fetch(url,{method:'GET',signal:ctl?ctl.signal:undefined});
+    clearTimeout(to);
+    return {ok:r.ok,st:r.status};
+  }catch(e){clearTimeout(to);return {ok:false,err:String((e&&e.name?e.name+': ':'')+((e&&e.message)||e)).slice(0,70)};}
+}
+function timg(url,ms){
+  return new Promise(function(res){
+    try{
+      const im=new Image();
+      const to=setTimeout(function(){res({ok:false,err:'TIMEOUT'});},ms||8000);
+      im.onload=function(){clearTimeout(to);res({ok:true});};
+      im.onerror=function(){clearTimeout(to);res({ok:false,err:'ERROR-EVENT'});};
+      im.src=url+'?t='+Date.now();
+    }catch(e){res({ok:false,err:'EXC:'+String((e&&e.message)||e).slice(0,50)});}
+  });
+}
+async function run(){
+  const el=document.getElementById('out');
+  el.innerHTML='<div class="r">Berjalan...</div>';
+  let h='';
+  let r=await tfetch('https://www.google.com/generate_204',8000);
+  h+=row('1','Fetch internet umum (google)',r.ok,r.ok?'':(r.st||r.err));
+  r=await tfetch('https://example.com/',8000);
+  h+=row('2','Fetch situs biasa (example)',r.ok,r.ok?'':(r.st||r.err));
+  r=await tfetch('https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js',8000);
+  h+=row('3','Fetch CDN publik',r.ok,r.ok?'':(r.st||r.err));
+  r=await tfetch(BASE+'/api/pixel',8000);
+  h+=row('4','Fetch tunnel kita',r.ok,r.ok?'':(r.st||r.err));
+  let im=await timg(BASE+'/api/pixel',8000);
+  h+=row('5','Gambar via tunnel',im.ok,im.ok?'':im.err);
+  h+=row('6','Pelanggaran CSP tertangkap',VIOL.length>0,VIOL.length?VIOL.slice(0,3).join(' | '):'tidak ada event (blokir level lebih rendah)');
+  el.innerHTML=h+'<div class="r">Selesai. Screenshot semua baris.</div>';
+}
+document.getElementById('re').onclick=run;
+run();
+</script>
+</body>
+</html>

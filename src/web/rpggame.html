@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>RPG Adventure - WA Bot Full</title>
+<style>
+:root{--felt:#14231a;--ivory:#efe7d8;--brass:#c7a452;--walnut:#7c4a32}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+body{margin:0;background:var(--felt);color:var(--ivory);font-family:system-ui,sans-serif;text-align:center;padding:8px}
+#hud{display:flex;gap:8px;justify-content:center;font-size:13px;font-weight:700;flex-wrap:wrap;margin:6px}
+.bar{width:110px;height:10px;background:#27272a;border-radius:6px;overflow:hidden;margin-top:2px}
+.bar i{display:block;height:100%}
+#map{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;max-width:420px;margin:6px auto;background:#0f1f14;padding:6px;border-radius:10px;border:2px solid var(--walnut)}
+.t{aspect-ratio:1/1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:20px}
+.g{background:#2c6e3f}.w{background:#3f6e8e}.m{background:#5b5b66}.v{background:#8a6d1f}.k{background:#6e6e78}.b{background:#3a1f4d}
+#log{background:#0f1f14;border-radius:8px;max-width:420px;margin:6px auto;padding:8px;font-size:13px;min-height:44px;text-align:left}
+#pad{display:grid;grid-template-columns:repeat(3,62px);gap:6px;justify-content:center;margin:8px}
+#pad button,#acts button{background:#2e4a33;color:#fff;border:1px solid var(--brass);border-radius:10px;font-size:20px;padding:10px}
+#acts{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:6px}
+#acts button{font-size:14px}
+.row{display:flex;gap:6px;justify-content:center;margin:8px;flex-wrap:wrap}
+input{padding:9px;border-radius:8px;border:1px solid var(--walnut);background:#0f1f14;color:#fff;width:150px}
+#cls{display:flex;gap:6px;justify-content:center;margin:6px}
+#cls button.sel{border-color:var(--brass);background:#3a2f10}
+#msg{font-size:13px;min-height:18px}
+</style>
+</head>
+<body>
+<h2 style="margin:4px">RPG ADVENTURE</h2>
+<div id="cls">
+<button data-c="warrior" class="sel">Warrior</button><button data-c="mage">Mage</button><button data-c="archer">Archer</button>
+</div>
+<div id="hud">
+<span>Lv <b id="lv">1</b></span>
+<span>Nyawa<div class="bar"><i id="hp" style="background:#10b981;width:100%"></i></div></span>
+<span>Mana<div class="bar"><i id="mp" style="background:#3b82f6;width:100%"></i></div></span>
+<span>XP <b id="xp">0</b></span><span>Gold <b id="gold">50</b></span>
+</div>
+<div id="map"></div>
+<div id="log">Pilih class lalu tekan MULAI.</div>
+<div class="row"><button id="start">MULAI</button></div>
+<div id="pad" style="display:none">
+<span></span><button data-d="0,-1">▲</button><span></span>
+<button data-d="-1,0">◀</button><button data-d="0,1">▼</button><button data-d="1,0">▶</button>
+</div>
+<div id="acts" style="display:none">
+<button id="aAtk">Serang</button><button id="aSkill">Skill</button><button id="aHeal">Potion (<span id="pot">1</span>)</button><button id="aFlee">Kabur</button>
+</div>
+<div id="msg"></div>
+<script>
+const KEY=(function(){try{return new URLSearchParams(location.search).get('key')||'';}catch(e){return '';}})();
+const store=(function(){
+  function ls(){try{if(typeof localStorage==='undefined')return null;localStorage.setItem('__t','1');if(localStorage.getItem('__t')!=='1')return null;localStorage.removeItem('__t');return localStorage;}catch(e){return null;}}
+  const L=ls();const mem={};let wn=null;
+  try{wn=JSON.parse(window.name||'{}');if(!wn||typeof wn!=='object'||Array.isArray(wn))wn={};}catch(e){wn={};}
+  function saveWn(){try{window.name=JSON.stringify(wn);}catch(e){}}
+  return{
+    get:function(k){try{if(L){const v=L.getItem(k);if(v!==null&&v!==undefined)return v;}}catch(e){} if(wn&&k in wn)return wn[k]; return (k in mem)?mem[k]:null;},
+    set:function(k,v){try{if(L){L.setItem(k,v);return;}}catch(e){} try{wn[k]=v;saveWn();}catch(e2){mem[k]=v;}}
+  };
+})();
+const PTOK='__PTOK__';
+const CLS={warrior:{hp:120,mp:40,atk:[12,20],sk:{n:'Tebasan Berat',d:[25,40],mp:15}},mage:{hp:80,mp:100,atk:[10,18],sk:{n:'Ledakan Api',d:[28,45],mp:30}},archer:{hp:95,mp:60,atk:[11,22],sk:{n:'Hujan Panah',d:[22,38],mp:25}}};
+const TER=[['m','g','b'],['w','k','g'],['g','v','m']];
+const MON=[['Slime',30,8],['Goblin',50,12],['Serigala',70,17],['Golem',110,24]];
+let P=null,E=null,started=false;
+let myCls='warrior';
+document.querySelectorAll('#cls button').forEach(b=>b.onclick=()=>{myCls=b.dataset.c;document.querySelectorAll('#cls button').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');});
+const R=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+function say(t){document.getElementById('log').innerHTML=t;}
+function hud(){
+  lv.textContent=P.lv;xp.textContent=P.xp;gold.textContent=P.gold;pot.textContent=P.potion;
+  hp.style.width=(100*P.hp/P.maxHp)+'%';mp.style.width=(100*P.mp/P.maxMp)+'%';
+}
+function draw(){
+  const m=document.getElementById('map');m.innerHTML='';
+  for(let y=0;y<7;y++)for(let x=0;x<7;x++){
+    const d=document.createElement('div');
+    const lx=Math.min(2,Math.max(0,P.x+Math.floor((x-3)/2.4))),ly=Math.min(2,Math.max(0,P.y+Math.floor((y-3)/2.4)));
+    d.className='t '+TER[ly][lx].toLowerCase();
+    if(x===3&&y===3)d.textContent='🧝';
+    else if(E&&x===4&&y===2)d.textContent='👹';
+    m.appendChild(d);
+  }
+}
+document.getElementById('start').onclick=()=>{
+  const s=CLS[myCls];
+  P={cls:myCls,lv:1,xp:0,gold:50,potion:1,hp:s.hp,maxHp:s.hp,mp:s.mp,maxMp:s.mp,x:1,y:1};
+  E=null;started=true;
+  document.getElementById('pad').style.display='grid';
+  document.getElementById('acts').style.display='flex';
+  hud();draw();say('Petualangan dimulai di <b>Kota</b>. Bergeraklah dengan pad.');
+};
+document.querySelectorAll('#pad button').forEach(b=>b.onclick=()=>{
+  if(!started||E)return;
+  const[dx,dy]=b.dataset.d.split(',').map(Number);
+  const nx=P.x+dx,ny=P.y+dy;
+  if(nx<0||nx>2||ny<0||ny>2){say('Ujung dunia.');return;}
+  P.x=nx;P.y=ny;
+  const loc=[['Gunung','Hutan','Gua Bos'],['Danau','Kota','Hutan'],['Hutan','Ladang','Reruntuhan']][ny][nx];
+  if(loc==='Kota'){P.hp=P.maxHp;P.mp=P.maxMp;say('Tiba di <b>Kota</b>. Pulih penuh.');}
+  else if(Math.random()<0.5){
+    const M=MON[Math.floor(Math.random()*MON.length)];
+    const hp=M[1]+P.lv*6;
+    E={name:M[0],hp,maxHp:hp,atk:M[2]};
+    say('Tiba di <b>'+loc+'</b>. Seekor <b>'+E.name+'</b> ('+hp+' nyawa) menghadang! Serang!');
+  } else say('Tiba di <b>'+loc+'</b>. Aman.');
+  hud();draw();
+});
+function enemyHit(){
+  if(!E)return;
+  const dmg=R(5,12)+P.lv*2;P.hp-=dmg;
+  if(P.hp<=0){P.hp=0;say('Kamu tumbang! Menekan MULAI untuk coba lagi (gold -10%).');P.gold=Math.floor(P.gold*0.9);E=null;}
+  hud();draw();
+}
+document.getElementById('aAtk').onclick=()=>{
+  if(!started||!E)return;
+  const s=CLS[P.cls];const dmg=R(s.atk[0],s.atk[1])+(P.lv-1)*2;
+  E.hp-=dmg;
+  if(E.hp<=0){win();return;}
+  say('Kamu menyerang, '+E.name+' -'+dmg+'.');enemyHit();
+};
+document.getElementById('aSkill').onclick=()=>{
+  if(!started||!E)return;
+  const s=CLS[P.cls];
+  if(P.mp<s.sk.mp){say('Mana kurang.');return;}
+  P.mp-=s.sk.mp;const dmg=R(s.sk.d[0],s.sk.d[1])+(P.lv-1)*2;
+  E.hp-=dmg;
+  if(E.hp<=0){win();return;}
+  say(s.sk.n+'! '+E.name+' -'+dmg+'.');enemyHit();hud();draw();
+};
+document.getElementById('aHeal').onclick=()=>{
+  if(!started)return;
+  if(P.potion<1){say('Potion habis.');return;}
+  if(P.hp>=P.maxHp){say('Nyawa penuh.');return;}
+  P.potion--;P.hp=Math.min(P.maxHp,P.hp+50);hud();draw();
+  say('Minum potion. Nyawa '+P.hp+'/'+P.maxHp+'.');
+  if(E)enemyHit();
+};
+document.getElementById('aFlee').onclick=()=>{
+  if(!started||!E)return;
+  if(Math.random()<0.5){E=null;say('Berhasil kabur.');}
+  else say('Gagal kabur!');hud();draw();
+  if(E)enemyHit();
+};
+function win(){
+  const xp=40,g=20;P.xp+=xp;P.gold+=g;
+  const nl=1+Math.floor(P.xp/200);
+  if(nl>P.lv){P.lv=nl;P.maxHp+=15;P.maxMp+=5;P.hp=P.maxHp;P.mp=P.maxMp;say(E.name+' kalah! +'+xp+' XP, +'+g+' gold. <b>Naik level '+nl+'!</b>');}
+  else say(E.name+' kalah! +'+xp+' XP, +'+g+' gold.');
+  E=null;hud();draw();
+}
+</script>
+</body>
+</html>

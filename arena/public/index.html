@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>RPG PvP Arena</title>
+<style>
+  :root{--bg:#0a0a0b;--panel:#18181b;--line:#27272a;--accent:#f59e0b;--text:#fafafa;--muted:#a1a1aa}
+  *{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;overflow:hidden}
+  #bar{height:52px;background:#09090b;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:0 14px}
+  #logo{width:32px;height:32px;background:#f59e0b;border-radius:8px;display:grid;place-items:center;font-weight:900;color:#000}
+  #room{font-family:monospace;font-size:13px;color:var(--muted)}#room b{color:#fff;letter-spacing:0.08em}
+  #players{display:flex;gap:6px;margin-left:auto;overflow-x:auto}
+  .pill{font-size:11px;padding:4px 8px;border-radius:999px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;gap:6px;white-space:nowrap}
+  .dot{width:8px;height:8px;border-radius:50%}.hp{width:48px;height:6px;background:#27272a;border-radius:999px;overflow:hidden}.hp i{display:block;height:100%;transition:width .2s}
+  #wrap{display:flex;height:calc(100% - 52px)}#side{width:300px;background:#0f0f10;border-left:1px solid var(--line);display:flex;flex-direction:column}
+  canvas{flex:1;background:#87ceeb;display:block}
+  #log{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:6px;font-size:12px}
+  .log{padding:6px 8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:#d4d4d8}
+  #controls{padding:10px;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+  .btn{background:var(--panel);border:1px solid var(--line);color:#fff;border-radius:10px;padding:12px;font-weight:700;touch-action:manipulation}
+  .btn:active{transform:translateY(1px);background:#27272a}
+  .btn.cd{opacity:.45}
+  #join{position:absolute;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;overflow:auto}
+  .card{width:380px;max-width:94vw;background:#18181b;border:1px solid #3f3f46;border-radius:16px;padding:18px;margin:12px}
+  .card h1{margin:0 0 6px;font-size:18px}.card p{margin:0 0 12px;color:var(--muted);font-size:13px;line-height:1.5}
+  .input{width:100%;background:#09090b;border:1px solid #3f3f46;border-radius:10px;padding:10px 12px;color:#fff;outline:none}
+  .primary{width:100%;margin-top:10px;background:#f59e0b;color:#000;border:0;border-radius:10px;padding:12px;font-weight:800;cursor:pointer}
+  .hint{font-size:11px;color:#71717a;margin-top:8px;text-align:center}
+  .cls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0}
+  .clsBtn{background:#09090b;border:2px solid #3f3f46;border-radius:12px;padding:10px 6px;color:#fff;cursor:pointer;text-align:center}
+  .clsBtn b{display:block;font-size:14px}.clsBtn small{color:var(--muted);font-size:10px;line-height:1.4;display:block;margin-top:4px}
+  .clsBtn.sel{border-color:var(--accent);background:#221a08}
+  #banner{position:absolute;top:64px;left:50%;transform:translateX(-50%);background:#18181b;border:1px solid var(--accent);border-radius:12px;padding:10px 18px;font-weight:800;display:none;z-index:30}
+  @media(max-width:768px){#side{display:none}canvas{width:100%!important}}
+</style>
+</head>
+<body>
+<div id="bar">
+  <div id="logo">R</div>
+  <div>
+    <div style="font-weight:800;letter-spacing:-0.02em">RPG PvP ARENA</div>
+    <div id="room">room: <b id="roomId">LOBBY</b> · <span id="status">connecting...</span></div>
+  </div>
+  <div id="players"></div>
+  <button id="copy" class="btn" style="padding:8px 12px;font-size:12px">Copy Link</button>
+</div>
+<div id="banner"></div>
+<div id="wrap">
+  <canvas id="c" width="800" height="480"></canvas>
+  <div id="side">
+    <div id="log"></div>
+    <div id="controls">
+      <button class="btn" data-k="left">◀</button>
+      <button class="btn" data-k="jump">▲ LOMPAT</button>
+      <button class="btn" data-k="right">▶</button>
+      <button class="btn" id="bAtk" data-k="attack" style="background:#f59e0b;color:#000">SERANG</button>
+      <button class="btn" id="bSkill" data-k="skill" style="background:#a855f7;color:#fff">SKILL</button>
+      <button class="btn" data-k="bomb" style="background:#ef4444;color:#fff">BOM</button>
+    </div>
+    <div style="padding:8px 10px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)">
+      WASD gerak · J/SPACE serang · K skill · B bom · Menang 5 kill · Level up tiap 200 XP
+    </div>
+  </div>
+</div>
+<div id="join">
+  <div class="card">
+    <h1>Masuk RPG Arena</h1>
+    <p>Pilih class, masuk room, PvP real-time 2-6 pemain. Pemenang = 5 kill pertama.</p>
+    <div class="cls" id="clsPick">
+      <button class="clsBtn sel" data-c="warrior"><b>Warrior</b><small>HP 120 · Tebasan 34 · Skill: Dash Strike</small></button>
+      <button class="clsBtn" data-c="mage"><b>Mage</b><small>HP 80 · Fireball 26 · Skill: Frost Nova</small></button>
+      <button class="clsBtn" data-c="archer"><b>Archer</b><small>HP 90 · Panah cepat 16 · Skill: Triple Shot</small></button>
+    </div>
+    <input id="name" class="input" placeholder="Nama kamu (mis: Budi)"/>
+    <input id="roomIn" class="input" style="margin-top:8px" placeholder="Kode room (kosong = LOBBY)"/>
+    <button id="go" class="primary">MASUK ARENA</button>
+    <div class="hint">WA: ketik <b>!arena ABC1</b> → bot kirim link ini.</div>
+  </div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

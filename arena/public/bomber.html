@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>Neko Park - Bomber PvP</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:#1a1033;color:#fff;font-family:system-ui,sans-serif;overflow:hidden;user-select:none}
+  #top{height:44px;display:flex;align-items:center;gap:8px;padding:0 10px;background:#241545;font-size:13px}
+  #room{margin-left:auto;color:#c4b5fd;font-size:12px}
+  #c{display:block;width:100%;height:38vh;background:#f9a8d4;touch-action:none}
+  #chatbox{height:11vh;overflow-y:auto;padding:6px 10px;font-size:12px;background:#160d29}
+  #chatbox div{margin:2px 0;color:#e9d5ff}#chatbox b{color:#fbbf24}
+  #emojis{display:flex;gap:6px;justify-content:center;padding:6px;background:#160d29}
+  #emojis button{font-size:20px;background:#2e1a5e;border:1px solid #4c2a99;border-radius:10px;padding:4px 10px}
+  #move{display:flex;gap:8px;padding:6px 10px;background:#160d29}
+  #move .mbtn{flex:1;background:#2e1a5e;border:2px solid #6d5bd0;border-radius:14px;color:#fff;font-size:26px;padding:12px 0;font-weight:800}
+  #move .mbtn:active{background:#4c2a99}
+  #acts{display:flex;gap:8px;padding:6px 10px;background:#160d29}
+  #acts button{border-radius:14px;font-weight:800;color:#fff;font-size:15px;padding:14px 0;border:2px solid}
+  #bBom{flex:1.4;background:#1f2937;border-color:#fbbf24}
+  #bJump{flex:1;background:#db2777;border-color:#f9a8d4}
+  #chatrow{display:flex;gap:6px;padding:6px 10px calc(10px + env(safe-area-inset-bottom));background:#160d29}
+  #chatIn{flex:1;background:#0f0a1f;border:1px solid #4c2a99;border-radius:10px;padding:10px;color:#fff;outline:none}
+  #chatSend{background:#f59e0b;border:0;border-radius:10px;padding:10px 16px;font-weight:800}
+  #zoom{position:absolute;top:50px;left:8px;display:flex;flex-direction:column;gap:6px}
+  #zoom button{background:rgba(0,0,0,.55);color:#fff;border:1px solid #fff3;border-radius:8px;font-size:11px;padding:6px 8px;font-weight:700}
+  #join{position:absolute;inset:0;background:rgba(10,5,25,.92);display:flex;align-items:center;justify-content:center;z-index:10}
+  .card{width:340px;max-width:92vw;background:#241545;border:1px solid #6d5bd0;border-radius:16px;padding:18px}
+  .card h1{margin:0 0 6px}.card p{color:#c4b5fd;font-size:13px}
+  .input{width:100%;background:#0f0a1f;border:1px solid #6d5bd0;border-radius:10px;padding:10px;color:#fff;margin-top:8px}
+  .primary{width:100%;margin-top:10px;background:#f59e0b;border:0;border-radius:10px;padding:12px;font-weight:800}
+  #banner{position:absolute;top:50px;left:50%;transform:translateX(-50%);background:#241545;border:1px solid #f59e0b;border-radius:12px;padding:8px 16px;font-weight:800;display:none;z-index:20}
+</style>
+</head>
+<body>
+<div id="top"><b>NEKO PARK</b><span id="plist"></span><span id="room"></span></div>
+<div id="banner"></div>
+<div style="position:relative">
+  <canvas id="c"></canvas>
+  <div id="zoom"><button id="zOut">JAUH</button><button id="zIn">DEKAT</button></div>
+</div>
+<div id="chatbox"></div>
+<div id="emojis"></div>
+<div id="move">
+  <button class="mbtn" id="mL">◀</button>
+  <button class="mbtn" id="mR">▶</button>
+</div>
+<div id="acts">
+  <button id="bBom">PAKAI BOM</button>
+  <button id="bJump">LOMPAT</button>
+</div>
+<div id="chatrow">
+  <input id="chatIn" placeholder="chat global..." maxlength="60"/>
+  <button id="chatSend">Kirim</button>
+</div>
+<div id="join"><div class="card">
+  <h1>Neko Park</h1>
+  <p>Bomber PvP real-time. Ketuk tombol untuk gerak, lompat, dan lempar bom.</p>
+  <input id="name" class="input" placeholder="Nama kamu"/>
+  <input id="roomIn" class="input" placeholder="Kode room (kosong = LOBBY)"/>
+  <button id="go" class="primary">MAIN</button>
+</div></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+const TILE=32,MAP_W=25,MAP_H=15;
+let map=[],players=new Map(),bombs=[],me=null,zoom=1,camX=0,camY=0,shake=0,fxs=[];
+let room='LOBBY';
+try{room=new URLSearchParams(location.search).get('room')||'LOBBY';}catch(e){}
+document.getElementById('room').textContent='room '+room;
+document.getElementById('roomIn').value=room==='LOBBY'?'':room;
+const socket=io({query:{room}});
+let keys={left:false,right:false};
+
+// emoji bar
+['👋','❤️','😂','😡','🎉','✨'].forEach(e=>{
+  const b=document.createElement('button');b.textContent=e;
+  b.onclick=()=>socket.emit('emoji',{e});
+  document.getElementById('emojis').appendChild(b);
+});
+
+// join
+document.getElementById('go').onclick=()=>{
+  const name=document.getElementById('name').value.trim()||('Neko'+Math.floor(Math.random()*99));
+  const r=document.getElementById('roomIn').value.trim().toUpperCase()||'LOBBY';
+  try{if(typeof localStorage!=='undefined')localStorage.setItem('neko_name',name);}catch(e){}
+  room=r;try{history.replaceState(null,'','/bomber.html?room='+room);}catch(e){}
+  document.getElementById('room').textContent='room '+room;
+  socket.emit('join',{name,room,cls:'warrior',wa:''});
+  document.getElementById('join').style.display='none';
+};
+try{if(typeof localStorage!=='undefined')document.getElementById('name').value=localStorage.getItem('neko_name')||'';}catch(e){}
+
+socket.on('joined',d=>{me=d.id;map=d.map;size();});
+socket.on('roomState',d=>{players=new Map(d.players.map(p=>[p.id,p]));bombs=d.bombs||[];plist();});
+socket.on('tick',d=>{
+  for(const p of d.players){const cur=players.get(p.id);if(cur)Object.assign(cur,p);else players.set(p.id,p);}
+  for(const id of[...players.keys()])if(!d.players.find(p=>p.id===id))players.delete(id);
+  bombs=d.bombs||[];
+});
+socket.on('fx',f=>{f.t=performance.now();fxs.push(f);if(fxs.length>60)fxs.shift();if(f.type==='explode')shake=8;});
+socket.on('log',m=>addChat(null,m));
+socket.on('chat',m=>addChat(m.name,m.text));
+socket.on('matchEnd',d=>{
+  const b=document.getElementById('banner');b.style.display='block';
+  b.textContent='Pemenang: '+d.winner;setTimeout(()=>b.style.display='none',8000);
+});
+function addChat(n,m){
+  const el=document.getElementById('chatbox');const d=document.createElement('div');
+  d.innerHTML=n?('<b>'+esc(n)+':</b> '+esc(m)):esc(m);
+  el.appendChild(d);el.scrollTop=el.scrollHeight;
+}
+function esc(s){return String(s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));}
+function plist(){
+  document.getElementById('plist').textContent=[...players.values()].map(p=>p.name+' '+p.kills+'K').join(' · ');
+}
+setInterval(plist,1000);
+
+// chat kirim
+function sendChat(){const i=document.getElementById('chatIn');if(i.value.trim())socket.emit('chat',{text:i.value});i.value='';}
+document.getElementById('chatSend').onclick=sendChat;
+document.getElementById('chatIn').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+
+// kontrol gerak (tahan)
+function hold(el,k){
+  const on=e=>{e.preventDefault();keys[k]=true;};
+  const off=e=>{e.preventDefault();keys[k]=false;};
+  el.addEventListener('touchstart',on);el.addEventListener('touchend',off);el.addEventListener('touchcancel',off);
+  el.addEventListener('mousedown',on);el.addEventListener('mouseup',off);el.addEventListener('mouseleave',off);
+}
+hold(document.getElementById('mL'),'left');
+hold(document.getElementById('mR'),'right');
+const tap=(id,fn)=>{const el=document.getElementById(id);
+  el.addEventListener('touchstart',e=>{e.preventDefault();fn();});
+  el.addEventListener('mousedown',fn);};
+tap('bJump',()=>send({jump:true}));
+tap('bBom',()=>send({bomb:true}));
+document.getElementById('zIn').onclick=()=>zoom=Math.min(2,zoom+0.25);
+document.getElementById('zOut').onclick=()=>zoom=Math.max(0.6,zoom-0.25);
+addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='arrowleft'||k==='a')keys.left=true;
+  if(k==='arrowright'||k==='d')keys.right=true;
+  if(k===' '||k==='arrowup'||k==='w')send({jump:true});
+  if(k==='b')send({bomb:true});
+});
+addEventListener('keyup',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='arrowleft'||k==='a')keys.left=false;
+  if(k==='arrowright'||k==='d')keys.right=false;
+});
+function send(extra={}){socket.emit('input',{left:keys.left,right:keys.right,jump:!!extra.jump,...extra});}
+setInterval(()=>send(),1000/30);
+
+// render
+function size(){c.width=c.clientWidth||window.innerWidth;c.height=window.innerHeight*0.38;}
+addEventListener('resize',size);size();
+function lerp(a,b,t){return a+(b-a)*t;}
+function draw(){
+  requestAnimationFrame(draw);
+  const now=performance.now();
+  const meP=players.get(me);
+  const vw=c.width/zoom,vh=c.height/zoom;
+  if(meP){
+    camX=lerp(camX,meP.x+meP.w/2-vw/2,0.12);
+    camY=lerp(camY,meP.y+meP.h/2-vh/2,0.12);
+    camX=Math.max(0,Math.min(MAP_W*TILE-vw,camX));
+    camY=Math.max(0,Math.min(MAP_H*TILE-vh,camY));
+  }
+  ctx.save();
+  ctx.scale(zoom,zoom);
+  ctx.translate(-camX,-camY);
+  if(shake>0){ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);shake*=.92;if(shake<.5)shake=0;}
+  // langit senja
+  const g=ctx.createLinearGradient(0,camY,0,camY+vh);
+  g.addColorStop(0,'#f9a8d4');g.addColorStop(.55,'#c4b5fd');g.addColorStop(1,'#86efac');
+  ctx.fillStyle=g;ctx.fillRect(camX,camY,vw,vh);
+  // matahari
+  ctx.fillStyle='#fef9c3';ctx.beginPath();ctx.arc(camX+vw-70,camY+60,26,0,Math.PI*2);ctx.fill();
+  // map
+  for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++)if(map[y]&&map[y][x]){
+    const sx=x*TILE,sy=y*TILE;
+    ctx.fillStyle=y>=MAP_H-2?'#92400e':'#a16207';
+    ctx.fillRect(sx,sy,TILE,TILE);
+    if(y===MAP_H-2){ctx.fillStyle='#4ade80';ctx.fillRect(sx,sy,TILE,7);}
+  }
+  // bom
+  for(const b of bombs){
+    const t=(now-b.at)/2000;
+    ctx.fillStyle='#18181b';ctx.beginPath();ctx.arc(b.x+8,b.y+8,10,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ef4444';ctx.beginPath();ctx.arc(b.x+8,b.y+2,3,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=`rgba(239,68,68,${.3+t*.4})`;ctx.beginPath();ctx.arc(b.x+8,b.y+8,14+t*10,0,Math.PI*2);ctx.stroke();
+  }
+  // pemain (kucing: badan + telinga)
+  for(const p of players.values()){
+    const sx=p.x,sy=p.y;
+    ctx.fillStyle=p.alive?p.color:'#52525b';
+    ctx.fillRect(sx,sy,p.w,p.h+4);
+    // telinga
+    ctx.beginPath();ctx.moveTo(sx+2,sy);ctx.lineTo(sx+7,sy-7);ctx.lineTo(sx+12,sy);ctx.fill();
+    ctx.beginPath();ctx.moveTo(sx+p.w-12,sy);ctx.lineTo(sx+p.w-7,sy-7);ctx.lineTo(sx+p.w-2,sy);ctx.fill();
+    // wajah arah
+    ctx.fillStyle='#000';
+    const ex=p.dir===1?sx+p.w-8:sx+5;
+    ctx.beginPath();ctx.arc(ex,sy+10,2.4,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(ex+(p.dir===1?7:-7),sy+10,2.4,0,Math.PI*2);ctx.fill();
+    // nama + hp
+    ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(sx-8,sy-24,p.w+16,13);
+    ctx.fillStyle='#fff';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText(p.name+(p.wa?' ✓':''),sx+p.w/2,sy-14);
+    ctx.fillStyle='#27272a';ctx.fillRect(sx-2,sy-9,p.w+4,4);
+    ctx.fillStyle=p.hp>50?'#4ade80':'#ef4444';
+    ctx.fillRect(sx-2,sy-9,(p.w+4)*p.hp/(p.maxHp||100),4);
+    if(!p.alive){ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(sx-6,sy-6,p.w+12,p.h+16);}
+  }
+  // fx
+  fxs=fxs.filter(f=>now-f.t<1200);
+  for(const f of fxs){
+    const age=(now-f.t)/(f.type==='emoji'?1200:700);
+    if(f.type==='explode'){
+      ctx.fillStyle=`rgba(245,158,11,${1-age})`;ctx.beginPath();ctx.arc(f.x,f.y,f.r*(.4+age*.6),0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff';ctx.font='bold 13px sans-serif';ctx.textAlign='center';ctx.fillText('BOOM!',f.x,f.y-30*(1-age));
+    }else if(f.type==='emoji'){
+      ctx.font='22px sans-serif';ctx.textAlign='center';ctx.fillText(f.e,f.x,f.y-20*age);
+    }else if(f.type==='hit'){
+      ctx.fillStyle=`rgba(255,255,255,${1-age})`;ctx.beginPath();ctx.arc(f.x,f.y,8,0,Math.PI*2);ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+draw();
+</script>
+</body>
+</html>

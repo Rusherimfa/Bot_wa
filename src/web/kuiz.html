@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kuis Kilat - WA Bot Full</title>
+<style>
+  body{margin:0;background:#0f172a;color:#e2e8f0;font-family:system-ui,sans-serif;text-align:center;padding:12px}
+  #q{background:#1e293b;border-radius:12px;padding:18px;margin:12px auto;max-width:480px;font-size:18px;min-height:60px}
+  .opt{display:block;width:100%;max-width:480px;margin:8px auto;padding:14px;border-radius:10px;border:0;background:#334155;color:#fff;font-size:16px}
+  .opt:active{background:#16a34a}
+  #top{display:flex;justify-content:center;gap:20px;font-weight:700}
+  #timer{color:#fbbf24}#skor{color:#4ade80}
+  input{padding:10px;border-radius:8px;border:1px solid #475569;background:#1e293b;color:#fff;width:170px}
+  #kirim{padding:10px 14px;border-radius:8px;border:0;background:#16a34a;color:#fff;font-weight:700}
+</style>
+</head>
+<body>
+<h2>KUIS KILAT</h2>
+<div id="top"><span>Waktu: <span id="timer">60</span>s</span><span>Benar: <span id="skor">0</span></span></div>
+<div id="q">Memuat...</div>
+<div id="opts"></div>
+<div style="margin-top:10px">
+<span id="msg" style="font-size:13px"></span></div>
+<script>
+const KEY=(function(){try{return new URLSearchParams(location.search).get('key')||'';}catch(e){return '';}})();
+const store=(function(){
+  function ls(){try{if(typeof localStorage==='undefined')return null;localStorage.setItem('__t','1');if(localStorage.getItem('__t')!=='1')return null;localStorage.removeItem('__t');return localStorage;}catch(e){return null;}}
+  const L=ls();const mem={};let wn=null;
+  try{wn=JSON.parse(window.name||'{}');if(!wn||typeof wn!=='object'||Array.isArray(wn))wn={};}catch(e){wn={};}
+  function saveWn(){try{window.name=JSON.stringify(wn);}catch(e){}}
+  return{
+    get:function(k){try{if(L){const v=L.getItem(k);if(v!==null&&v!==undefined)return v;}}catch(e){} if(wn&&k in wn)return wn[k]; return (k in mem)?mem[k]:null;},
+    set:function(k,v){try{if(L){L.setItem(k,v);return;}}catch(e){} try{wn[k]=v;saveWn();}catch(e2){mem[k]=v;}}
+  };
+})();
+const PTOK='__PTOK__';
+const BANK=[
+ ["Ibu kota Kalimantan Timur?","Samarinda","Balikpapan","Bontang","Penajam"],
+ ["2 + 3 x 4 = ?","14","24","20","10"],
+ ["Hewan tercepat di darat?","Cheetah","Kuda","Singa","Kijang"],
+ ["Lagu kebangsaan Indonesia?","Indonesia Raya","Garuda Pancasila","Maju Tak Gentar","Halo-Halo Bandung"],
+ ["Planet terdekat dari matahari?","Merkurius","Venus","Mars","Bumi"],
+ ["Jumlah sila Pancasila?","5","4","6","3"],
+ ["Air mendidih pada suhu?","100C","90C","80C","120C"],
+ ["Mata uang Jepang?","Yen","Won","Dolar","Rupiah"],
+ ["Pulau terbesar di Indonesia?","Papua","Jawa","Sumatra","Kalimantan"],
+ ["Presiden pertama Indonesia?","Soekarno","Soeharto","Habibie","Jokowi"],
+ ["Hasil 7 x 8?","56","54","63","48"],
+ ["Warna bendera Indonesia?","Merah Putih","Putih Merah","Merah Kuning","Biru Putih"],
+ ["Sungai terpanjang di dunia?","Nil","Amazon","Kapuas","Mahakam"],
+ ["Jumlah hari dalam setahun (non kabisat)?","365","366","364","360"],
+ ["Hewan berkantung dari Australia?","Kanguru","Koala","Panda","Beruang"],
+];
+let idx=0,benar=0,sisa=60,jalan=true;
+function acak(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+const soal=acak([...BANK]);
+function tampil(){
+  if(!jalan||idx>=soal.length)return mulai(false);
+  const [t,b,...s]=soal[idx];
+  q.textContent=(idx+1)+'. '+t;
+  opts.innerHTML='';
+  acak([b,...s]).forEach(o=>{
+    const btn=document.createElement('button');btn.className='opt';btn.textContent=o;
+    btn.onclick=()=>{if(o===b){benar++;skor.textContent=benar;}idx++;tampil();};
+    opts.appendChild(btn);
+  });
+}
+function mulai(baru=true){
+  if(!baru||!jalan)return;
+  jalan=false;q.textContent='Waktu habis. Benar: '+benar+' dari '+soal.length+'.';
+  opts.innerHTML='';
+}
+const t=setInterval(()=>{sisa--;timer.textContent=sisa;if(sisa<=0){clearInterval(t);mulai();}},1000);
+tampil();
+</script>
+</body>
+</html>

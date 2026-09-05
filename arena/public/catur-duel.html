@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Duel Catur</title>
+<style>
+:root{--felt:#14231a;--ivory:#efe7d8;--walnut:#7c4a32;--walnut-dark:#5e3722;--brass:#c7a452;--warn:#c25b4a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+body{margin:0;background:var(--felt);color:var(--ivory);font-family:system-ui,sans-serif;text-align:center;padding:10px}
+#status{margin:8px;font-weight:700;min-height:22px}
+#board{width:100%;max-width:480px;margin:auto;aspect-ratio:1/1;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border:3px solid var(--walnut-dark);border-radius:6px;overflow:hidden;position:relative}
+.sq{position:relative;display:flex;align-items:center;justify-content:center}
+.sq.light{background:var(--ivory)}.sq.dark{background:var(--walnut)}
+.sq .ov{position:absolute;inset:0}
+.sq.lastmove .ov{background:rgba(199,164,82,.28)}
+.sq.checksq .ov{background:rgba(194,91,74,.55)}
+.sq.selected .ov{box-shadow:inset 0 0 0 3px var(--brass)}
+.sq .piece{position:relative;z-index:2;width:88%;height:88%;pointer-events:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.4))}
+.sq .dot{position:absolute;width:26%;height:26%;border-radius:50%;background:rgba(199,164,82,.6);z-index:1}
+.row{display:flex;gap:8px;justify-content:center;margin:10px}
+button{background:var(--walnut);color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:700}
+a#kirimBtn{display:none;margin:10px auto;max-width:480px;background:#16a34a;color:#fff;font-weight:800;font-size:18px;border-radius:12px;padding:14px;text-decoration:none}
+a#kirimBtn.show{display:block}
+.hint{font-size:12px;color:#9fb3a0;margin-top:6px}
+</style>
+</head>
+<body>
+<h2 style="margin:6px">DUEL CATUR</h2>
+<div id="status">Memuat...</div>
+<div id="board"></div>
+<a id="kirimBtn" href="#">KIRIM LANGKAH</a>
+<div class="hint" id="hint">Ketuk bidakmu, lalu ketuk kotak tujuan.</div>
+<script>/*__ENGINE__*/</script>
+<script>
+const MYSIDE='__SIDE__';
+const BOTNUM='__BOTNUM__';
+const STARTFEN='__FEN__';
+const PIECES=__PIECES__;
+let game=null,sel=null,legal=[],flipped=false,sentMove=null;
+const myColor=(MYSIDE==='b')?'b':'w';
+flipped=(myColor==='b');
+function sqName(r,f){const a='abcdefgh';return flipped?a[7-f]+(r+1):a[f]+(8-r);}
+function parseFen(fen){
+  const b=Array.from({length:8},()=>Array(8).fill(null));
+  const rows=fen.split(' ')[0].split('/');
+  for(let r=0;r<8;r++){let f=0;for(const ch of rows[r]){if(/\d/.test(ch)){f+=parseInt(ch,10);}else{b[r][f]={t:ch.toLowerCase(),w:ch===ch.toUpperCase()};f++;}}}
+  return b;
+}
+function draw(){
+  const b=document.getElementById('board');b.innerHTML='';
+  const bd=parseFen(game.fen());
+  const last=game.history({verbose:true}).slice(-1)[0];
+  const lm=last?[last.from,last.to]:[];
+  let chk=null;
+  if(game.inCheck()){outer:for(let r=0;r<8;r++)for(let f=0;f<8;f++){const p=bd[r][f];if(p&&p.type==='k'&&p.color===game.turn()){chk=sqName(r,f);break outer;}}}
+  for(let r=0;r<8;r++)for(let f=0;f<8;f++){
+    const sq=sqName(r,f);const d=document.createElement('div');
+    const light=(r+f)%2===0;
+    d.className='sq '+(light?'light':'dark');
+    if(lm.includes(sq))d.classList.add('lastmove');
+    if(sq===chk)d.classList.add('checksq');
+    if(sq===sel)d.classList.add('selected');
+    d.innerHTML='<div class="ov"></div>';
+    const pr=flipped?bd[7-r][7-f]:bd[r][f];
+    if(pr){const s=document.createElement('span');s.className='piece';s.innerHTML=PIECES[pr.t+(pr.w?'W':'B')];d.appendChild(s);}
+    if(legal.includes(sq)){const dot=document.createElement('div');dot.className='dot';d.appendChild(dot);}
+    d.onclick=()=>tap(sq);
+    b.appendChild(d);
+  }
+  const turn=game.turn();
+  let st;
+  if(game.isGameOver())st=game.isCheckmate()?('SKAKMAT! Menang: '+(turn==='w'?'Hitam':'Putih')):'Remis.';
+  else st='Giliran: '+(turn==='w'?'Putih':'Hitam')+(turn===myColor?' (kamu!)':' (lawan...)');
+  document.getElementById('status').textContent=st;
+}
+function tap(sq){
+  if(sentMove)return;
+  const turn=game.turn();
+  if(turn!==myColor)return;
+  const p=game.get(sq);
+  if(sel&&legal.includes(sq)){
+    const mv=sq;
+    document.getElementById('kirimBtn').textContent='KIRIM '+sel.toUpperCase()+' → '+mv.toUpperCase();
+    document.getElementById('kirimBtn').href='https://wa.me/'+BOTNUM+'?text='+encodeURIComponent('!dm '+sel+mv);
+    document.getElementById('kirimBtn').classList.add('show');
+    sel=null;legal=[];draw();
+    return;
+  }
+  if(p&&p.color===myColor){sel=sq;legal=game.moves({square:sq,verbose:true}).map(m=>m.to);}
+  else{sel=null;legal=[];}
+  draw();
+}
+try{
+  game=new Chess(STARTFEN);
+  document.getElementById('kirimBtn').classList.remove('show');
+  draw();
+}catch(e){
+  document.getElementById('status').textContent='Gagal memuat papan.';
+}
+</script>
+</body>
+</html>

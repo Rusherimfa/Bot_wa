@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Spotify Player</title>
+<title>Spotify Player Full</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 body{margin:0;color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:20px 14px 18px;background:#0b0f0d}
@@ -54,20 +54,21 @@ h2{margin:12px 0 2px;font-size:20px;text-shadow:0 2px 8px rgba(0,0,0,.8)}
     <div id="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
     <div id="controls">
       <button class="skip" id="back"><svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M11 18V6l-8.5 6L11 18zm.5-6l8.5 6V6l-8.5 6z"/></svg></button>
-      <button id="play" disabled></button>
+      <button id="play"></button>
       <button class="skip" id="fwd"><svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button>
     </div>
-    <div id="status">Menyiapkan…</div>
+    <div id="status">Ketuk play</div>
     <div id="err"></div>
     <div id="dbg"></div>
-    <div class="hint">Ketuk bar untuk lompat • Full: !spotifyfull / !spotifydl</div>
+    <div class="hint">Ketuk bar untuk lompat</div>
   </div>
 </div>
 <script>
 (function(){
-var B64='__AUDIO_B64__';
+var PARTS=__PARTS__;
+var DURS=__DURS__;
+var TOTAL=__TOTAL__;
 var COVERB64='__COVER_B64__';
-var FALLBACK_DUR=__DUR__;
 var ICON_PLAY='<svg width="34" height="34" viewBox="0 0 24 24" fill="#04120a"><path d="M8 5v14l11-7z"/></svg>';
 var ICON_PAUSE='<svg width="34" height="34" viewBox="0 0 24 24" fill="#04120a"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
 var ICON_LOAD='<svg class="spin" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#04120a" stroke-width="3"><path d="M12 3a9 9 0 1 0 9 9"/></svg>';
@@ -80,10 +81,10 @@ var btn=document.getElementById('play'),bar=document.getElementById('bar'),
     viz=document.getElementById('viz'),
     bgs=[document.getElementById('bgA'),document.getElementById('bgB'),document.getElementById('bgC')],
     cover=document.getElementById('cover'),coverfb=document.getElementById('coverfb');
-btn.innerHTML=ICON_LOAD;
-try{document.getElementById('dbg').textContent='dbg a:'+Math.round(B64.length/1024)+'K c:'+Math.round(COVERB64.length/1024)+'K s:'+(STILLS?STILLS.length:0);}catch(e){}
+btn.innerHTML=ICON_PLAY;
+durEl.textContent=fmt(TOTAL);
+try{document.getElementById('dbg').textContent='dbg n:'+PARTS.length+' tot:'+fmt(TOTAL);}catch(e){}
 function fmt(s){if(!isFinite(s)||s<0)s=0;s=Math.floor(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
-durEl.textContent=fmt(FALLBACK_DUR);
 function setStatus(t){status.textContent=t;}
 function fail(m){btn.disabled=true;btn.innerHTML=ICON_ERR;setStatus('Gagal.');err.textContent=m||'Audio kartu gagal. Pakai !spotifydl untuk full song.';}
 function coverCheck(){
@@ -95,9 +96,7 @@ function coverCheck(){
 cover.addEventListener('load',coverCheck);
 cover.addEventListener('error',coverCheck);
 setTimeout(coverCheck,2500);
-// Slideshow sinematik: stills 720p + zoom pelan + crossfade 4 detik.
-// Alasan: flip cepat di atas gambar detail (teks!) terlihat burik karena
-// mata tak sempat fokus; stills selalu tajam. Jalan sejak kartu dibuka.
+// Slideshow sinematik (sama seperti kartu preview).
 var si=0;
 (function initBg(){
   try{
@@ -123,62 +122,99 @@ function drawLive(){
   for(var i=0;i<32;i++){var v=freq[i]/255,h=Math.max(3,v*44);vc.fillStyle=v>0.7?'#1ed760':'#1db954';vc.fillRect(i*8+2,46-h,5,h);}
 }
 var AC=window.AudioContext||window.webkitAudioContext;
-if(!AC||!B64||B64.indexOf('__AUDIO')===0){fail(!AC?'Perangkat tidak mendukung audio kartu. Pakai !spotifydl.':null);return;}
-var ctx=null,audioBuf=null,src=null,timer=null,playing=false,offset=0,t0=0,off0=0;
+if(!AC||!PARTS||!PARTS.length){fail(!AC?'Perangkat tidak mendukung audio kartu. Pakai !spotifydl.':null);return;}
+var ctx=null,bufs={},src=null,timer=null,playing=false;
+var pi=0,off0=0,t0=0,globalOff=0,playToken=0;
 try{ctx=new AC({sampleRate:24000});}catch(e){try{ctx=new AC();}catch(e2){}}
 if(!ctx){fail('Perangkat tidak mendukung audio kartu. Pakai !spotifydl.');return;}
 try{analyser=ctx.createAnalyser();analyser.fftSize=64;freq=new Uint8Array(analyser.frequencyBinCount);}catch(e){analyser=null;}
 function b64ToBuf(b64){var bin=atob(b64),n=bin.length,u8=new Uint8Array(n);for(var i=0;i<n;i++)u8[i]=bin.charCodeAt(i);return u8.buffer;}
-function dur(){return audioBuf?audioBuf.duration:(FALLBACK_DUR||60);}
-function pos(){
-  if(!audioBuf)return 0;
-  if(!playing)return offset;
-  return Math.min(off0+(ctx.currentTime-t0),audioBuf.duration);
+function baseOf(i){var s=0;for(var k=0;k<i&&k<DURS.length;k++)s+=DURS[k];return s;}
+function localPos(){
+  if(!playing)return 0;
+  var bd=bufs[pi]?bufs[pi].duration:DURS[pi];
+  return Math.min(off0+(ctx.currentTime-t0),bd);
 }
-function paint(){var p=pos(),d=dur();bar.style.width=(100*p/d)+'%';cur.textContent=fmt(p);}
+function globalPos(){
+  if(!playing)return globalOff;
+  return Math.min(baseOf(pi)+localPos(),TOTAL);
+}
+function paint(){var p=globalPos();bar.style.width=(100*p/TOTAL)+'%';cur.textContent=fmt(p);}
 function tick(){
   paint();drawLive();
-  if(audioBuf&&pos()>=audioBuf.duration-0.15){stopAll();offset=0;bar.style.width='0%';cur.textContent='0:00';drawIdle();btn.innerHTML=ICON_PLAY;setStatus('Selesai.');}
+  if(globalPos()>=TOTAL-0.3){finishAll();}
 }
-function stopAll(){playing=false;if(timer){clearInterval(timer);timer=null;}if(src){try{src.onended=null;src.stop();}catch(e){}src=null;}}
-function doPlay(){
+function finishAll(){stopSrc();globalOff=0;bar.style.width='0%';cur.textContent='0:00';drawIdle();btn.innerHTML=ICON_PLAY;setStatus('Selesai.');}
+function stopSrc(){playing=false;if(timer){clearInterval(timer);timer=null;}if(src){try{src.onended=null;src.stop();}catch(e){}src=null;}}
+function decodePart(i,ok,no,silent){
+  if(bufs[i]){ok(bufs[i]);return;}
+  if(!silent)setStatus('Memuat bagian '+(i+1)+'/'+DURS.length+'…');
+  try{
+    var pr=ctx.decodeAudioData(b64ToBuf(PARTS[i]),
+      function(b){bufs[i]=b;ok(b);},
+      function(){if(no)no();});
+    if(pr&&pr.then)pr.then(function(b){bufs[i]=b;ok(b);},function(){if(no)no();});
+  }catch(e){if(no)no();}
+}
+function prefetch(i){
+  if(i<0||i>=PARTS.length||bufs[i])return;
+  decodePart(i,function(){for(var k in bufs){if(+k!==i&&+k!==pi){try{delete bufs[k];}catch(e){bufs[k]=null;}}}},null,true);
+}
+function playSrc(i,local){
+  stopSrc();
   try{
     if(ctx.state==='suspended'){var r=ctx.resume();if(r&&r.catch)r.catch(function(){});}
-    src=ctx.createBufferSource();src.buffer=audioBuf;
+    src=ctx.createBufferSource();src.buffer=bufs[i];
     if(analyser){src.connect(analyser);analyser.connect(ctx.destination);}
     else src.connect(ctx.destination);
-    src.onended=function(){if(playing){stopAll();offset=0;bar.style.width='0%';cur.textContent='0:00';drawIdle();btn.innerHTML=ICON_PLAY;setStatus('Selesai.');}};
-    off0=offset% audioBuf.duration;t0=ctx.currentTime;
-    src.start(0,off0);
-    playing=true;btn.innerHTML=ICON_PAUSE;setStatus('Memutar.');err.textContent='';
+    src.onended=function(){if(playing)advance(i);};
+    pi=i;off0=local;t0=ctx.currentTime;
+    src.start(0,local);
+    playing=true;btn.innerHTML=ICON_PAUSE;
+    setStatus('Memutar (bagian '+(i+1)+'/'+DURS.length+').');err.textContent='';
     timer=setInterval(tick,250);
-  }catch(e){fail('Gagal mulai ('+(e&&e.message||e)+'). Pakai !spotifydl.');}
+    prefetch(i+1);
+  }catch(e){fail('Gagal mulai. Pakai !spotifydl.');}
 }
-function seekTo(sec){
-  if(!audioBuf)return;
-  sec=Math.max(0,Math.min(audioBuf.duration-0.2,sec));
-  var was=playing;stopAll();offset=sec;
-  if(was)doPlay();else{paint();setStatus('Siap.');}
+function playAt(g){
+  g=Math.max(0,Math.min(TOTAL-0.2,g));
+  var i=0;while(i<DURS.length-1&&g>=baseOf(i)+DURS[i])i++;
+  var local=Math.max(0,Math.min(DURS[i]-0.2,g-baseOf(i)));
+  stopSrc();
+  var my=++playToken;
+  setStatus('Memuat…');err.textContent='';
+  decodePart(i,function(){
+    if(my!==playToken)return;
+    for(var k in bufs){if(+k!==i&&+k!==i+1){try{delete bufs[k];}catch(e){bufs[k]=null;}}}
+    playSrc(i,local);
+  },function(){if(my===playToken)fail('Audio rusak di bagian '+(i+1)+'. Pakai !spotifydl.');});
+}
+function advance(i){
+  var nx=i+1;
+  if(nx>=DURS.length){finishAll();return;}
+  if(timer){clearInterval(timer);timer=null;}
+  src=null;
+  playAt(baseOf(nx)+0.01);
+}
+function seekTo(g){
+  if(!PARTS.length)return;
+  g=Math.max(0,Math.min(TOTAL-0.2,g));
+  var was=playing;playToken++;stopSrc();
+  if(was)playAt(g);else{globalOff=g;paint();setStatus('Siap.');}
 }
 btn.onclick=function(){
-  if(!audioBuf)return;
-  if(playing){offset=pos();stopAll();drawIdle();btn.innerHTML=ICON_PLAY;setStatus('Jeda.');}
-  else doPlay();
+  if(!PARTS.length)return;
+  if(playing){globalOff=globalPos();playToken++;stopSrc();drawIdle();btn.innerHTML=ICON_PLAY;setStatus('Jeda.');}
+  else playAt(globalOff);
 };
-document.getElementById('back').onclick=function(){if(audioBuf)seekTo(pos()-10);};
-document.getElementById('fwd').onclick=function(){if(audioBuf)seekTo(pos()+10);};
+document.getElementById('back').onclick=function(){seekTo(globalPos()-10);};
+document.getElementById('fwd').onclick=function(){seekTo(globalPos()+10);};
 barwrap.addEventListener('click',function(e){
-  if(!audioBuf)return;
   var r=barwrap.getBoundingClientRect();
   var x=(e.clientX!=null?e.clientX:(e.touches&&e.touches[0]?e.touches[0].clientX:r.left));
-  seekTo(((x-r.left)/r.width)*dur());
+  seekTo(((x-r.left)/r.width)*TOTAL);
 });
-try{
-  var done=function(buf){audioBuf=buf;durEl.textContent=fmt(buf.duration);btn.disabled=false;btn.innerHTML=ICON_PLAY;setStatus('Siap.');};
-  var derr=function(){fail('Audio rusak saat dibaca. Pakai !spotifydl.');};
-  var pr=ctx.decodeAudioData(b64ToBuf(B64),done,derr);
-  if(pr&&pr.then)pr.then(done,derr);
-}catch(e){fail('Tidak bisa proses audio. Pakai !spotifydl.');}
+paint();
 })();
 </script>
 </body>

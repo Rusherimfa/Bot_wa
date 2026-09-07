@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Tes Ringan</title>
+<style>
+body{margin:0;background:#111;color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:30px 14px}
+#play{width:80px;height:80px;border-radius:50%;background:#1db954;border:0;color:#000;font-size:32px;margin:10px auto;display:block}
+#st{font-size:12px;color:#888}
+</style>
+</head>
+<body>
+<h3>Tes Audio Ringan</h3>
+<p style="color:#aaa;font-size:13px">Tanpa gambar, tanpa animasi, tanpa visual. Murni suara.</p>
+<button id="play" disabled>…</button>
+<div id="st">Menyiapkan…</div>
+<script>
+(function(){
+var B64='__AUDIO_B64__';
+var btn=document.getElementById('play'),st=document.getElementById('st');
+function fmt(s){s=Math.floor(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+var AC=window.AudioContext||window.webkitAudioContext;
+if(!AC){st.textContent='Tidak didukung';return;}
+var ctx=null;
+try{ctx=new AC({sampleRate:24000});}catch(e){try{ctx=new AC();}catch(e2){st.textContent='Tidak didukung';return;}}
+function b64ToBuf(b){var b2=atob(b),n=b2.length,u8=new Uint8Array(n);for(var i=0;i<n;i++)u8[i]=b2.charCodeAt(i);return u8.buffer;}
+var buf=null,src=null,on=false;
+btn.onclick=function(){
+  if(!buf)return;
+  if(on){try{src.stop();}catch(e){}on=false;btn.textContent='▶';st.textContent='Jeda';return;}
+  try{
+    if(ctx.state==='suspended'){var r=ctx.resume();if(r&&r.catch)r.catch(function(){});}
+    src=ctx.createBufferSource();src.buffer=buf;src.connect(ctx.destination);
+    src.onended=function(){if(on){on=false;btn.textContent='▶';st.textContent='Selesai ('+fmt(buf.duration)+')';}};
+    src.start(0,0);on=true;btn.textContent='⏸';st.textContent='Memutar '+fmt(buf.duration)+' — dengar 30 detik, patah atau mulus?';
+  }catch(e){st.textContent='Gagal: '+e.message;}
+};
+try{
+  var ok=function(b){buf=b;btn.disabled=false;btn.textContent='▶';st.textContent='Siap ('+fmt(b.duration)+'). Ketuk play.';};
+  var no=function(){st.textContent='Decode gagal';};
+  var pr=ctx.decodeAudioData(b64ToBuf(B64),ok,no);
+  if(pr&&pr.then)pr.then(ok,no);
+}catch(e){st.textContent='Decode error';}
+})();
+</script>
+</body>
+</html>

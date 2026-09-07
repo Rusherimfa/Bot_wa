@@ -12,6 +12,44 @@ async function getImageBuffer(sock, m) {
   } catch { return null; }
 }
 
+// Rakit kartu player Spotify: audio + cover + frame bg gerak ditanam base64,
+// bunyi via WebAudio (satu-satunya jalur audio yang lolos WebView WA).
+async function buildSpotCard({ title, artist, dur, tag, mp3File, cover, stills }) {
+  const { esc } = await import('../services/track.js');
+  const fs = await import('fs');
+  const audioB64 = fs.readFileSync(mp3File).toString('base64');
+  if (audioB64.length > 700000) throw new Error('file terlalu besar untuk kartu, pakai !spotifydl');
+  let coverB64 = '';
+  try { if (cover) coverB64 = fs.readFileSync(cover).toString('base64'); } catch { /* fallback SVG */ }
+  let html = fs.readFileSync(new URL('../web/spotify.html', import.meta.url).pathname, 'utf8');
+  html = html.split('__TITLE__').join(esc(title)).split('__ARTIST__').join(esc(artist))
+    .split('__TAG__').join(esc(tag)).split('__DUR__').join(String(dur))
+    .split('__AUDIO_B64__').join(audioB64)
+    .split('__COVER_B64__').join(coverB64)
+    .split('__STILLS__').join(stills && stills.length ? JSON.stringify(stills) : '[]');
+  if (html.length > 990000) throw new Error('kartu kebesaran untuk WA — pakai !spotifyfull / !spotifydl');
+  return html;
+}
+
+// Kartu full chunked: potongan 60 detik dimainkan sambung-menyambung,
+// decode just-in-time agar HP kentang tidak patah-patah.
+async function buildFullCard({ title, artist, total, tag, chunks, durs, cover, stills }) {
+  const { esc } = await import('../services/track.js');
+  const fs = await import('fs');
+  const parts = chunks.map((f) => fs.readFileSync(f).toString('base64'));
+  let coverB64 = '';
+  try { if (cover) coverB64 = fs.readFileSync(cover).toString('base64'); } catch { /* fallback SVG */ }
+  let html = fs.readFileSync(new URL('../web/spotify-full.html', import.meta.url).pathname, 'utf8');
+  html = html.split('__TITLE__').join(esc(title)).split('__ARTIST__').join(esc(artist))
+    .split('__TAG__').join(esc(tag)).split('__TOTAL__').join(JSON.stringify(Math.floor(total)))
+    .split('__PARTS__').join(JSON.stringify(parts))
+    .split('__DURS__').join(JSON.stringify(durs.map((d) => Math.round(d * 100) / 100)))
+    .split('__COVER_B64__').join(coverB64)
+    .split('__STILLS__').join(stills && stills.length ? JSON.stringify(stills) : '[]');
+  if (html.length > 990000) throw new Error('kartu kebesaran untuk WA — pakai !spotifyfull / !spotifydl');
+  return html;
+}
+
 export const media = [
   {
     name: 's', aliases: ['sticker', 'stiker'], desc: 'Foto -> stiker (reply foto)',
@@ -32,7 +70,7 @@ export const media = [
       await send(jid, 'Memproses. Mohon tunggu...');
       try {
         const meta = await sharp(buf).metadata();
-        const out = await sharp(buf).resize((meta.width || 800) * 2, null, { kernel: 'lanczos3' })
+        const out = await sharp(buf).resize({ width: (meta.width || 800) * 2, kernel: 'lanczos3' })
           .sharpen().jpeg({ quality: 90 }).toBuffer();
         await sock.sendMessage(jid, { image: out, caption: 'Hasil penjernihan 2x, diproses lokal.' });
       } catch { await send(jid, 'Gagal memproses foto.'); }
@@ -66,49 +104,211 @@ export const media = [
     },
   },
   {
-    name: 'spotify', aliases: ['musik', 'lagu', 'play'], desc: '!spotify <judul> player lagu 60 detik',
+    name: 'spotify', aliases: ['musik', 'lagu', 'play'], desc: '!spotify <judul> [full] kartu preview / full-song-1-kartu',
     async run({ jid, raw, send, sock }) {
-      if (!raw) return send(jid, 'Gunakan: !spotify <judul lagu>\nContoh: !spotify kenangan terindah');
-      const { execFile } = await import('child_process');
-      const fs = await import('fs');
-      const crypto = await import('crypto');
-      const runYt = (args) => new Promise((resolve, reject) => {
-        execFile(process.env.HOME + '/.local/bin/yt-dlp', args, { timeout: 120000 }, (err, stdout, stderr) => {
-          // yt-dlp bisa exit non-zero walau file jadi (mis. max-downloads) — pemanggil cek file
-          if (err && !stdout) reject(new Error((stderr || err.message).split('\n').filter(Boolean).slice(-2).join(' ')));
-          else resolve(stdout);
-        });
-      });
-      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      if (!raw) return send(jid, 'Gunakan: !spotify <judul lagu> [full]\nContoh: !spotify kenangan terindah\nFull 1 kartu: !spotify kenangan terindah full\nFull per menit: !spotifyfull <judul> • Full file: !spotifydl <judul>');
+      const { ensureTrack, ensureFullCard } = await import('../services/track.js');
       try {
-        await send(jid, `Mencari "${raw}"... (bisa ~1 menit)`);
-        const dir = new URL('../../data/music/', import.meta.url).pathname;
-        fs.mkdirSync(dir, { recursive: true });
-        const h = crypto.createHash('md5').update(raw.toLowerCase().trim()).digest('hex').slice(0, 12);
-        const mp3 = dir + h + '.mp3';
-        const metaF = dir + h + '.json';
-        let title = raw, artist = 'YouTube', dur = 60;
-        if (!fs.existsSync(mp3)) {
-          const meta = await runYt(['--no-playlist', '--skip-download', '--print', '%(title)s|%(uploader)s|%(duration)s', `ytsearch1:${raw}`]);
-          const parts = meta.trim().split('|');
-          if (parts[0]) title = parts[0].slice(0, 60);
-          if (parts[1] && parts[1] !== 'NA') artist = parts[1].slice(0, 40);
-          await runYt(['--no-playlist', '-x', '--audio-format', 'mp3', '--audio-quality', '48K',
-            '--download-sections', '*00:00-01:00', '-o', dir + h + '.%(ext)s', `ytsearch1:${raw}`]);
-          if (!fs.existsSync(mp3)) throw new Error('download gagal');
-          fs.writeFileSync(metaF, JSON.stringify({ title, artist }));
-        } else if (fs.existsSync(metaF)) {
-          try { ({ title, artist } = JSON.parse(fs.readFileSync(metaF, 'utf8'))); } catch { /* pakai default */ }
-        }
-        const b64 = fs.readFileSync(mp3).toString('base64');
-        if (b64.length > 1500000) throw new Error('file terlalu besar');
-        let html = fs.readFileSync(new URL('../web/spotify.html', import.meta.url).pathname, 'utf8');
-        html = html.split('__TITLE__').join(esc(title)).split('__ARTIST__').join(esc(artist))
-          .split('__DUR__').join(String(dur)).split('__AUDIO_B64__').join(b64);
+        let q = raw, wantFull = false;
+        if (/\sfull\s*$/i.test(q)) { wantFull = true; q = q.replace(/\sfull\s*$/i, '').trim(); }
+        if (!q) return send(jid, 'Judulnya apa? Contoh: !spotify kenangan terindah full');
         const { sendInlineWebUI } = await import('../wa/airich-send.js');
+        if (wantFull) {
+          await send(jid, `Menyiapkan FULL "${q}" 1 kartu... (bisa ~3 menit)`);
+          const { ensureTrack, ensureFullChunks } = await import('../services/track.js');
+          const { cover, stills } = await ensureTrack(q);
+          // Budget audio dinamis: sisa ruang kartu setelah cover+stills (html ≤960KB).
+          const fs0 = await import('fs');
+          let stillsLen = 0;
+          try { stillsLen = JSON.stringify(stills || []).length; } catch { /* abaikan */ }
+          let coverLen = 0;
+          try { if (cover) coverLen = fs0.readFileSync(cover).toString('base64').length; } catch { /* abaikan */ }
+          const targetKB = Math.max(200, Math.min(650, Math.floor(((960000 - 30000 - coverLen - stillsLen) / 1.336) / 1024)));
+          const { chunks, durs, total, title, artist, br, n } = await ensureFullChunks(q, 60, targetKB);
+          const html = await buildFullCard({
+            title, artist, total, tag: `FULL SONG • OPUS ${br}K • ${n} BAGIAN`,
+            chunks, durs, cover, stills,
+          });
+          await sendInlineWebUI(sock, jid, html, `Musik full: ${title}`);
+          await send(jid, `Full *${title}* 1 kartu, main sambung-menyambung (Opus ${br}K). Mau kualitas file? !spotifydl ${q}`);
+          return;
+        }
+        await send(jid, `Mencari "${q}"... (bisa ~1 menit)`);
+        const { mp3, cover, stills, title, artist, dur } = await ensureTrack(q);
+        const html = await buildSpotCard({ title, artist, dur, tag: 'PREVIEW 60 DETIK • OPUS 64K', mp3File: mp3, cover, stills });
         await sendInlineWebUI(sock, jid, html, `Musik: ${title}`);
       } catch (e) {
         await send(jid, `Gagal ambil lagu: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'spotifyfull', aliases: ['musikfull', 'lagufull', 'playfull'], desc: '!spotifyfull <judul> FULL song sebagai kartu per menit di UI',
+    async run({ jid, raw, send, sock }) {
+      if (!raw) return send(jid, 'Gunakan: !spotifyfull <judul lagu>\nContoh: !spotifyfull kenangan terindah');
+      const { ensureTrack, ensureParts } = await import('../services/track.js');
+      const { sendInlineWebUI } = await import('../wa/airich-send.js');
+      try {
+        await send(jid, `Menyiapkan FULL "${raw}" di UI... (bisa ~3 menit: unduh + potong per menit)`);
+        const { parts, title, artist, n } = await ensureParts(raw);
+        const { cover, stills } = await ensureTrack(raw);
+        const fs = await import('fs');
+        for (let i = 0; i < parts.length; i++) {
+          const html = await buildSpotCard({
+            title, artist, dur: 60,
+            tag: `BAGIAN ${i + 1}/${n} • FULL SONG`,
+            mp3File: parts[i], cover, stills,
+          });
+          await sendInlineWebUI(sock, jid, html, `Musik: ${title} (${i + 1}/${n})`);
+        }
+        await send(jid, `Full *${title}* terkirim ${n} kartu — putar berurutan dari 1/${n}. Lebih praktis? !spotifydl ${raw}`);
+      } catch (e) {
+        await send(jid, `Gagal ambil full: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'spotifydl', aliases: ['dlmusik', 'lagump3', 'musikdl'], desc: '!spotifydl <judul> kirim FULL song (file audio)',
+    async run({ jid, raw, send, sock }) {
+      if (!raw) return send(jid, 'Gunakan: !spotifydl <judul lagu>\nContoh: !spotifydl kenangan terindah');
+      const { ensureFull } = await import('../services/track.js');
+      try {
+        await send(jid, `Mengambil FULL "${raw}"... (bisa ~2 menit, file besar)`);
+        const { full, title, artist, url } = await ensureFull(raw);
+        const fs = await import('fs');
+        const crypto = await import('crypto');
+        const h = crypto.createHash('md5').update(raw.toLowerCase().trim()).digest('hex').slice(0, 12);
+        const coverP = new URL('../../data/music/' + h + '.jpg', import.meta.url).pathname;
+        const caption = `*${title}* — ${artist} (full)${url ? `\nVideo: ${url}` : ''}\nKartu UI: !spotify ${raw}`;
+        if (fs.existsSync(coverP)) {
+          await sock.sendMessage(jid, { image: fs.readFileSync(coverP), caption });
+        } else {
+          await send(jid, caption);
+        }
+        await sock.sendMessage(jid, { audio: fs.readFileSync(full), mimetype: 'audio/mpeg' });
+      } catch (e) {
+        await send(jid, `Gagal ambil lagu: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'spotifyv', aliases: ['videolagu', 'musikvideo', 'spotvideodl'], desc: '!spotifyv <judul> kirim video musik 60 detik',
+    async run({ jid, raw, send, sock }) {
+      if (!raw) return send(jid, 'Gunakan: !spotifyv <judul lagu>\nContoh: !spotifyv kenangan terindah');
+      const { ensureVideo } = await import('../services/track.js');
+      try {
+        await send(jid, `Mengambil video "${raw}"... (bisa ~2 menit, file besar)`);
+        const { clip, title } = await ensureVideo(raw);
+        const fs = await import('fs');
+        await sock.sendMessage(jid, { video: fs.readFileSync(clip), caption: `*${title}* (video 60 detik)`, mimetype: 'video/mp4' });
+      } catch (e) {
+        await send(jid, `Gagal ambil video: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'spotsize', aliases: ['tesbatas'], desc: '!spotsize ukur batas ukuran kartu (diagnosa)',
+    async run({ jid, send, sock }) {
+      try {
+        const fs = await import('fs');
+        const { sendInlineWebUI } = await import('../wa/airich-send.js');
+        let html = fs.readFileSync(new URL('../web/sizeprobe.html', import.meta.url).pathname, 'utf8');
+        html = html.split('__FILLER__').join('A'.repeat(700 * 1024));
+        await sendInlineWebUI(sock, jid, html, 'Ukur Batas');
+        await send(jid, 'Kartu ukur terkirim (kalau tampil). Laporkan angka di dalamnya / kalau tidak muncul sama sekali.');
+      } catch (e) {
+        await send(jid, `Gagal kirim tes: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'spottest', aliases: ['tesfps'], desc: '!spottest tes 30fps + WebP di UI',
+    async run({ jid, send, sock }) {
+      try {
+        const fs = await import('fs');
+        const { sendInlineWebUI } = await import('../wa/airich-send.js');
+        let html = fs.readFileSync(new URL('../web/fpstest.html', import.meta.url).pathname, 'utf8');
+        const fr = fs.readFileSync(new URL('../../data/music/fps-test.json', import.meta.url).pathname, 'utf8');
+        const webp = fs.readFileSync(new URL('../../data/music/webp-test.b64', import.meta.url).pathname, 'utf8');
+        html = html.split('__FRAMES60__').join(fr).split('__WEBP_B64__').join(webp.trim());
+        await sendInlineWebUI(sock, jid, html, 'Tes FPS');
+        await send(jid, 'Kartu tes terkirim. Laporkan: kotak merah tampil? angka fps berapa? lancar/patah?');
+      } catch (e) {
+        await send(jid, `Gagal kirim tes: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'spotsize2', aliases: ['tesbatas2'], desc: '!spotsize2 ukur batas kartu 1MB+ (diagnosa)',
+    async run({ jid, send, sock }) {
+      try {
+        const fs = await import('fs');
+        const { sendInlineWebUI } = await import('../wa/airich-send.js');
+        let html = fs.readFileSync(new URL('../web/sizeprobe.html', import.meta.url).pathname, 'utf8');
+        html = html.split('__FILLER__').join('B'.repeat(1000 * 1024));
+        await sendInlineWebUI(sock, jid, html, 'Ukur Batas 2');
+        await send(jid, 'Kartu ukur 2 terkirim (kalau tampil). Laporkan angka / kalau tidak muncul.');
+      } catch (e) {
+        await send(jid, `Gagal kirim tes: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'spotsize3', aliases: ['tesbatas3'], desc: '!spotsize3 ukur batas kartu ~1MB (diagnosa)',
+    async run({ jid, send, sock }) {
+      try {
+        const fs = await import('fs');
+        const { sendInlineWebUI } = await import('../wa/airich-send.js');
+        let html = fs.readFileSync(new URL('../web/sizeprobe.html', import.meta.url).pathname, 'utf8');
+        html = html.split('__FILLER__').join('C'.repeat(1000 * 1024));
+        await sendInlineWebUI(sock, jid, html, 'Ukur Batas 3');
+        await send(jid, 'Kartu ukur 3 terkirim (kalau tampil). Laporkan angka / kalau tidak muncul.');
+      } catch (e) {
+        await send(jid, `Gagal kirim tes: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'spottone', aliases: ['tesringan'], desc: '!spottone tes audio minimal tanpa visual (diagnosa patah)',
+    async run({ jid, raw, send, sock }) {
+      try {
+        const fs = await import('fs');
+        const { ensureTrack } = await import('../services/track.js');
+        const { sendInlineWebUI } = await import('../wa/airich-send.js');
+        const q = (raw || 'sency').trim();
+        const { mp3 } = await ensureTrack(q);
+        let html = fs.readFileSync(new URL('../web/tonetest.html', import.meta.url).pathname, 'utf8');
+        html = html.split('__AUDIO_B64__').join(fs.readFileSync(mp3).toString('base64'));
+        await sendInlineWebUI(sock, jid, html, 'Tes Ringan');
+        await send(jid, 'Kartu ringan terkirim (lagu yang sama, tanpa gambar/animasi). Putar 30 detik: MULUS atau PATAH?');
+      } catch (e) {
+        await send(jid, `Gagal kirim tes: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'spotdiag', aliases: ['tesaudio'], desc: '!spotdiag tes kemampuan audio WebView (diagnosa player)',
+    async run({ jid, send, sock }) {
+      try {
+        const fs = await import('fs');
+        const { sendInlineWebUI } = await import('../wa/airich-send.js');
+        const { esc } = await import('../services/track.js');
+        const { default: crypto } = await import('crypto');
+        const base = webBase();
+        // Nada tes 3 detik (dibuat via ffmpeg, lihat tools-make-testtone.sh)
+        const testH = crypto.createHash('md5').update('wa-test-tone').digest('hex').slice(0, 12);
+        const testUrl = `${base}/music/${testH}.mp3?key=${config.panelKey}`;
+        let html = fs.readFileSync(new URL('../web/audiotest.html', import.meta.url).pathname, 'utf8');
+        html = html.split('__TEST_URL__').join(esc(testUrl));
+        try {
+          const songH = crypto.createHash('md5').update('kenangan terindah').digest('hex').slice(0, 12);
+          html = html.split('__DIAG_CLIP_B64__').join(fs.readFileSync(new URL('../../data/music/' + songH + '.mp4', import.meta.url).pathname).toString('base64'));
+          html = html.split('__DIAG_COVER_B64__').join(fs.readFileSync(new URL('../../data/music/' + songH + '.jpg', import.meta.url).pathname).toString('base64'));
+        } catch { html = html.split('__DIAG_CLIP_B64__').join('').split('__DIAG_COVER_B64__').join(''); }
+        await sendInlineWebUI(sock, jid, html, 'Diagnosa Audio', { trustedSources: [base] });
+        await send(jid, 'Kartu tes terkirim di atas. Ketuk tiap tombol Tes, lalu laporkan hasil A/B/C ke owner.');
+      } catch (e) {
+        await send(jid, `Gagal kirim tes: ${e.message}`);
       }
     },
   },

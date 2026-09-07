@@ -66,6 +66,30 @@ export function startPanel(getCtx) {
   app.get('/catur', webGame('catur.html'));
   app.get('/rpggame', webGame('rpggame.html'));
 
+  // Musik hasil !spotify (mp3 60 detik). Auth via ?key= agar bisa dibuka
+  // dari WebView WA / HP satu jaringan / tunnel. Validasi hash anti-traversal.
+  app.get('/music/:h', (req, res) => {
+    const ok = webKey(req);
+    console.log(`[music] h=${req.params.h} key=${ok ? 'ok' : 'SALAH/HILANG'} range=${req.headers.range || '-'} ua=${String(req.headers['user-agent'] || '').slice(0, 60)}`);
+    if (!ok) return res.status(401).send('butuh ?key=PANEL_API_KEY');
+    const h = String(req.params.h || '').replace(/\.mp3$/, '');
+    if (!/^[a-f0-9]{12}$/i.test(h)) return res.status(400).send('hash tidak valid');
+    res.sendFile(new URL('../data/music/' + h + '.mp3', import.meta.url).pathname, {
+      headers: { 'Content-Type': 'audio/mpeg', 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=86400' },
+    }, (err) => { if (err && !res.headersSent) res.status(404).send('musik tidak ditemukan'); });
+  });
+
+  // Cover lagu !spotify (jpg 480px). Auth + validasi sama seperti /music.
+  app.get('/cover/:h', (req, res) => {
+    const ok = webKey(req);
+    console.log(`[cover] h=${req.params.h} key=${ok ? 'ok' : 'SALAH/HILANG'} ua=${String(req.headers['user-agent'] || '').slice(0, 60)}`);
+    if (!ok) return res.status(401).send('butuh ?key=PANEL_API_KEY');
+    const h = String(req.params.h || '').replace(/\.jpg$/, '');
+    if (!/^[a-f0-9]{12}$/i.test(h)) return res.status(400).send('hash tidak valid');
+    res.sendFile(new URL('../data/music/' + h + '.jpg', import.meta.url).pathname, {
+      headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=86400' },
+    }, (err) => { if (err && !res.headersSent) res.status(404).send('cover tidak ditemukan'); });
+  });
   // Terima skor dari game web -> masuk !rank. Batas anti-cheat per submit.
   // Identitas via token (otomatis dari chat) atau nomor manual (kompatibel lama).
   const MAX_SCORE = { snake: 100, kuiz: 100, chess: 40, rpgpvp: 100, rpghtml: 100 };

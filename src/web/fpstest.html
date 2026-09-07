@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Tes FPS</title>
+<style>
+body{margin:0;background:#121212;color:#fff;font-family:system-ui,sans-serif;padding:16px 14px;font-size:14px;text-align:center}
+.box{background:#1e1e1e;border-radius:10px;padding:12px;margin:8px 0}
+.big{font-size:22px;font-weight:800;color:#1db954}
+small{color:#aaa}
+button{background:#1db954;border:0;border-radius:8px;padding:8px 14px;font-weight:700;margin-top:6px}
+#fp{width:240px;aspect-ratio:16/9;border-radius:10px;background:#000;object-fit:cover}
+</style>
+</head>
+<body>
+<div class="box"><b>G3. Gambar WebP</b><small>Harusnya: kotak MERAH.</small><br><img src="data:image/webp;base64,__WEBP_B64__" width="64" height="64"></div>
+<div class="box"><b>Tes 30fps (jalan otomatis)</b><br><img id="fp" src=""><br><div class="big" id="rF">jalan…</div><small id="rD"></small><br><button id="again">Ulangi</button></div>
+<script>
+(function(){
+var FR=__FRAMES60__;
+var img=document.getElementById('fp'),rF=document.getElementById('rF'),rD=document.getElementById('rD');
+var i=0,t0=0,count=0,timer=null;
+img.src='data:image/jpeg;base64,'+FR[0];
+function loop(){
+  t0=performance.now();count=0;
+  timer=setInterval(function(){
+    i=(i+1)%FR.length;count++;
+    try{img.src='data:image/jpeg;base64,'+FR[i];}catch(e){}
+    var el=(performance.now()-t0)/1000;
+    if(el>=2){clearInterval(timer);timer=null;
+      rF.textContent='terukur: '+(count/el).toFixed(1)+' fps';
+      rD.textContent=count+' gambar dalam '+el.toFixed(1)+' detik. Lancar atau patah?';
+    }
+  },33);
+}
+document.getElementById('again').onclick=function(){i=0;rF.textContent='jalan…';loop();};
+setTimeout(loop,500);
+})();
+</script>
+</body>
+</html>

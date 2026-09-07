@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Diagnosa Audio</title>
+<style>
+body{margin:0;background:#121212;color:#fff;font-family:system-ui,sans-serif;padding:16px 14px;font-size:14px}
+h3{margin:0 0 8px;font-size:16px}
+.row{background:#1e1e1e;border-radius:10px;padding:10px;margin:8px 0}
+.row b{display:block;margin-bottom:2px}
+.row small{color:#aaa}
+button{background:#1db954;border:0;border-radius:8px;padding:8px 14px;font-weight:700;margin-top:6px}
+.res{font-size:13px;margin-top:6px;min-height:16px}
+.ok{color:#1db954}.fail{color:#ff6b6b}.run{color:#ffbb33}
+</style>
+</head>
+<body>
+<h3>Tes Audio + Visual WebView</h3>
+<div class="row"><b>A. WebAudio (tanpa file/server)</b><small>Oszilator nada langsung. Kalau ini gagal = WebView tak bisa bunyi sama sekali.</small><br><button id="bA">Tes A</button><div class="res" id="rA">-</div></div>
+<div class="row"><b>B. Data-URI (audio nempel di kartu)</b><small>Nada WAV kecil tanpa jaringan. Kalau gagal = kartu tak boleh bawa audio inline.</small><br><button id="bB">Tes B</button><div class="res" id="rB">-</div></div>
+<div class="row"><b>C. URL server (seperti !spotify)</b><small>MP3 nada tes dari server bot. Status muat: <span id="cstate">…</span></small><br><button id="bC">Tes C</button><div class="res" id="rC">-</div></div>
+<audio id="audC" preload="auto" src="__TEST_URL__"></audio>
+<h3 style="margin-top:14px">Tes Visual (jawab: kelihatan / tidak)</h3>
+<div class="row"><b>D. Gambar vektor (SVG)</b><small>Seharusnya terlihat: balok not musik hitam di kotak hijau.</small><br><div style="width:120px;height:80px;background:#1db954;border-radius:8px;display:flex;align-items:center;justify-content:center"><svg width="48" height="48" viewBox="0 0 24 24" fill="#000"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></div></div>
+<div class="row"><b>E. Animasi CSS</b><small>Seharusnya terlihat: kotak hijau geser kiri-kanan terus.</small><br><div style="width:100%;height:44px;background:#000;border-radius:8px;overflow:hidden"><div style="width:40px;height:44px;background:#1db954;animation:geser 1.2s ease-in-out infinite alternate"></div></div><style>@keyframes geser{from{margin-left:0}to{margin-left:calc(100% - 40px)}}</style></div>
+<div class="row"><b>F. Kanvas (gambar via kode)</b><small>Seharusnya terlihat: batang hijau + tulisan TES F.</small><br><canvas id="cvF" width="220" height="60" style="background:#000;border-radius:8px"></canvas></div>
+<div class="row"><b>G. Gambar data-URI</b><small>Seharusnya terlihat: kotak MERAH 64px.</small><br><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==" width="64" height="64" style="background:#333"></div>
+<div class="row"><b>G2. Gambar data-URI besar (seukuran cover lagu)</b><small>Seharusnya terlihat: foto penyanyi.</small><br><img src="data:image/jpeg;base64,__DIAG_COVER_B64__" width="220" style="border-radius:12px;background:#333"></div>
+<div class="row"><b>H. Video data-URI</b><small>Ketuk tombol: seharusnya video kecil ikut main.</small><br><video id="vdH" muted loop playsinline preload="auto" width="160" height="90" style="background:#000;border-radius:8px" src="data:video/mp4;base64,__DIAG_CLIP_B64__"></video><br><button id="bH">Putar H</button><div class="res" id="rH">-</div></div>
+<script>
+(function(){
+function set(id,txt,cls){var e=document.getElementById(id);e.textContent=txt;e.className='res '+cls;}
+// A: WebAudio murni
+document.getElementById('bA').onclick=function(){
+  set('rA','mengetes…','run');
+  try{
+    var AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC){set('rA','GAGAL: AudioContext tidak ada','fail');return;}
+    var ctx=new AC();
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);
+    o.frequency.value=440;g.gain.value=0.2;
+    o.start();
+    var p=null;
+    if(ctx.state==='suspended'){p=ctx.resume();}
+    if(p&&p.catch){p.catch(function(e){set('rA','GAGAL resume: '+(e&&e.name||e),'fail');});}
+    setTimeout(function(){try{o.stop();ctx.close();}catch(e){}set('rA','OK: bunyi? kalau tidak dengar = output diblokir','ok');},700);
+  }catch(e){set('rA','GAGAL: '+(e&&e.message||e),'fail');}
+};
+// B: WAV data-URI rakitan JS (0.5 dtk, 8kHz mono)
+function wavURI(){
+  var rate=8000,n=Math.floor(rate*0.5),i,d=new DataView(new ArrayBuffer(44+n*2));
+  function ws(o,s){for(var k=0;k<s.length;k++)d.setUint8(o+k,s.charCodeAt(k));}
+  ws(0,'RIFF');d.setUint32(4,36+n*2,true);ws(8,'WAVEfmt ');d.setUint32(16,16,true);
+  d.setUint16(20,1,true);d.setUint16(22,1,true);d.setUint32(24,rate,true);
+  d.setUint32(28,rate*2,true);d.setUint16(32,2,true);d.setUint16(34,16,true);
+  ws(36,'data');d.setUint32(40,n*2,true);
+  for(i=0;i<n;i++)d.setInt16(44+i*2,Math.floor(12000*Math.sin(2*Math.PI*660*i/rate)),true);
+  var bin='',bytes=new Uint8Array(d.buffer);
+  for(i=0;i<bytes.length;i++)bin+=String.fromCharCode(bytes[i]);
+  return 'data:audio/wav;base64,'+btoa(bin);
+}
+var bAudio=null;
+document.getElementById('bB').onclick=function(){
+  set('rB','mengetes…','run');
+  try{
+    bAudio=new Audio(wavURI());
+    var p=bAudio.play();
+    if(p&&p.catch){p.catch(function(e){set('rB','GAGAL play: '+(e&&e.name||e),'fail');return;});}
+    bAudio.onended=function(){set('rB','OK: bunyi? kalau tidak = data-URI diblokir','ok');};
+    bAudio.onerror=function(){var c=bAudio.error&&bAudio.error.code;set('rB','GAGAL muat (kode '+c+')','fail');};
+    setTimeout(function(){if(!bAudio.ended)set('rB','dimainkan… (dengar nada?)','run');},600);
+  }catch(e){set('rB','GAGAL: '+(e&&e.message||e),'fail');}
+};
+// C: MP3 remote
+var c=document.getElementById('audC'),st=document.getElementById('cstate');
+function cerr(){var e=c.error;var m={1:'dibatalkan',2:'jaringan gagal',3:'file rusak',4:'format tak didukung'};return e?('kode '+e.code+' ('+(m[e.code]||'?')+')'):'tak diketahui';}
+c.addEventListener('loadedmetadata',function(){st.textContent='metadata OK, durasi '+c.duration.toFixed(1)+' dtk';});
+c.addEventListener('canplay',function(){st.textContent='siap putar';});
+c.addEventListener('error',function(){st.textContent='GAGAL muat: '+cerr();set('rC','GAGAL muat: '+cerr(),'fail');});
+// F: gambar kanvas langsung saat kartu dibuka
+try{
+  var cv=document.getElementById('cvF'),g=cv.getContext('2d');
+  g.fillStyle='#000';g.fillRect(0,0,220,60);g.fillStyle='#1db954';
+  var hh=[12,28,40,22,34,16,44,26];for(var i=0;i<8;i++)g.fillRect(8+i*14,50-hh[i],10,hh[i]);
+  g.fillStyle='#fff';g.font='bold 16px sans-serif';g.fillText('TES F',150,36);
+}catch(e){}
+// H: video data-URI
+var vh=document.getElementById('vdH');
+document.getElementById('bH').onclick=function(){
+  set('rH','mengetes…','run');
+  try{
+    var p=vh.play();
+    if(p&&p.catch){p.catch(function(e){set('rH','GAGAL play: '+(e&&e.name||e),'fail');return;});}
+    vh.onplaying=function(){set('rH','diputar… (kelihatan gambar gerak?)','run');};
+    vh.onerror=function(){var cd=vh.error&&vh.error.code;set('rH','GAGAL muat (kode '+cd+')','fail');};
+    setTimeout(function(){set('rH','status: '+(vh.ended?'selesai':(vh.paused?'jeda':'main'))+', waktu='+vh.currentTime.toFixed(1),'run');},1500);
+  }catch(e){set('rH','GAGAL: '+(e&&e.message||e),'fail');}
+};
+try{c.load();}catch(e){st.textContent='load() error';}
+document.getElementById('bC').onclick=function(){
+  set('rC','mengetes…','run');
+  var p=null;
+  try{p=c.play();}catch(e){set('rC','GAGAL: '+(e&&e.message||e),'fail');return;}
+  if(p&&p.catch){p.catch(function(e){set('rC','GAGAL play: '+(e&&e.name||e)+' | muat: '+cerr(),'fail');return;});}
+  c.onended=function(){set('rC','OK: selesai diputar','ok');};
+  setTimeout(function(){if(!c.ended&&!c.paused)set('rC','diputar… (dengar nada?)','run');},600);
+};
+})();
+</script>
+</body>
+</html>

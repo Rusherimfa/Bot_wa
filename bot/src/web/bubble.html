@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Bubble Chat - WA Bot Full</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:#0b141a;color:#e9edef;max-width:480px;margin:0 auto;height:100vh;display:flex;flex-direction:column}
+.hd{background:#1f2c34;padding:9px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #0b141a}
+.av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#00a884,#025144);display:flex;align-items:center;justify-content:center;font-size:19px;flex:none}
+.hd b{font-size:14.5px;display:block}.hd small{font-size:11.5px;color:#53bdeb}
+#chat{flex:1;overflow-y:auto;padding:12px 10px 6px;background-color:#0b141a;background-image:radial-gradient(#182229 1px,transparent 1px);background-size:18px 18px}
+.day{text-align:center;margin:4px 0 10px}.day span{background:#182229;color:#ffd279;font-size:11px;padding:5px 12px;border-radius:8px}
+.msg{max-width:82%;padding:7px 9px 5px;border-radius:9px;font-size:13.8px;line-height:1.45;margin-bottom:7px;position:relative;box-shadow:0 1px 1px rgba(0,0,0,.4);animation:pop .22s ease;word-wrap:break-word}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}}
+.in{background:#1f2c34;align-self:flex-start;border-top-left-radius:2px}
+.out{background:#005c4b;align-self:flex-end;border-top-right-radius:2px}
+#chat{display:flex;flex-direction:column}
+.tm{display:block;text-align:right;font-size:10px;color:#ffffff99;margin-top:3px}
+.typing{display:inline-flex;gap:4px;padding:10px 12px;background:#1f2c34;border-radius:9px;margin-bottom:7px;align-self:flex-start}
+.typing i{width:7px;height:7px;border-radius:50%;background:#8696a0;animation:bl 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes bl{30%{opacity:.25;transform:translateY(-3px)}}
+#quick{display:flex;gap:6px;padding:7px 10px;overflow-x:auto;background:#0b141a;flex:none}
+#quick button{flex:none;background:transparent;color:#53bdeb;border:1px solid #53bdeb;border-radius:20px;padding:6px 12px;font-size:12.5px;cursor:pointer}
+#quick button:active{background:#53bdeb33}
+.bar{display:flex;gap:7px;padding:7px 10px 10px;background:#0b141a;align-items:center;flex:none}
+#inp{flex:1;background:#1f2c34;border:0;border-radius:22px;padding:10px 14px;color:#e9edef;font-size:14px;outline:none}
+#send{width:44px;height:44px;border-radius:50%;border:0;background:#00a884;color:#fff;font-size:18px;cursor:pointer;flex:none}
+#send:active{transform:scale(.92)}
+#skor{text-align:center;font-size:11.5px;color:#8696a0;padding:2px 0 6px;background:#0b141a}
+#skor b{color:#ffd279}#klaim{color:#53bdeb;text-decoration:underline;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="hd"><div class="av">🤖</div><div><b>Bot Bubble</b><small>online • balas otomatis</small></div></div>
+<div id="chat"><div class="day"><span>HARI INI</span></div></div>
+<div id="quick"></div>
+<div id="skor">pesan: <b id="cnt">0</b> • <span id="klaim">klaim skor</span></div>
+<div class="bar"><input id="inp" placeholder="Ketik pesan…" autocomplete="off"><button id="send">➤</button></div>
+<script>
+var KEY=(function(){try{return new URLSearchParams(location.search).get('key')||'';}catch(e){return '';}})();
+var PTOK='__PTOK__';
+var chat=document.getElementById('chat'),inp=document.getElementById('inp'),cnt=0;
+function jam(){var d=new Date();return('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);}
+function addBubble(txt,me){var d=document.createElement('div');d.className='msg '+(me?'out':'in');d.innerHTML=txt+'<span class="tm">'+jam()+(me?' ✓✓':'')+'</span>';chat.appendChild(d);chat.scrollTop=chat.scrollHeight;if(me){cnt++;document.getElementById('cnt').textContent=cnt;}}
+function typing(cb,ms){var t=document.createElement('div');t.className='typing';t.innerHTML='<i></i><i></i><i></i>';chat.appendChild(t);chat.scrollTop=chat.scrollHeight;setTimeout(function(){t.remove();cb();},ms||900);}
+var QUICK=['Halo 👋','Siapa kamu?','Jam berapa?','Ceritain lelucon','Bantu aku'];
+var q=document.getElementById('quick');
+QUICK.forEach(function(s){var b=document.createElement('button');b.textContent=s;b.onclick=function(){kirim(s);};q.appendChild(b);});
+function otak(s){
+  s=s.toLowerCase();
+  if(/halo|hai|pagi|siang|sore|malam|assalamu/.test(s))return 'Halo juga! 👋 Senang ngobrol sama kamu. Coba tanya yang lain~';
+  if(/siapa|nama|kamu/).test(s)return 'Aku <b>Bot Bubble</b> 🤖, hidup di dalam bubble chat ini. Dibuat dengan HTML murni, tanpa server chat tambahan!';
+  if(/jam|waktu|pukul/.test(s))return 'Sekarang jam <b>'+jam()+'</b> ⏰';
+  if(/lelucon|lucu|joke/.test(s)){var L=['Kenapa programmer benci alam? Karena banyak <i>bug</i> 🐛','Ikan apa yang paling pintar? Ikan... <i>teriak</i> 🤣','Kenapa WiFi putus? Karena dia butuh <i>ruang</i> 📶'];return L[Math.floor(Math.random()*L.length)];}
+  if(/bantu|help|bisa apa/.test(s))return 'Aku bisa: sapa 👋, kasih tau jam ⏰, lelucon 🤣, atau hitung! Coba kirim misal: <b>2+3*4</b>';
+  if(/^[0-9+\-*/(). %^]+$/.test(s)){try{return '<b>'+s+'</b> = <b>'+Function('return ('+s+')')()+'</b> 🧮';}catch(e){return 'Hmm, ekspresinya error 🤔';}}
+  if(/makasih|terima kasih|thanks/.test(s))return 'Sama-sama! 🥰';
+  if(/bye|dadah|sampai jumpa/.test(s))return 'Dadah~ 👋 Sampai jumpa di bubble berikutnya!';
+  var D=['Menarik! Ceritain lebih dong 👀','Ooh gitu~ terus? 🤔','Setuju banget! 💯','Haha, kamu lucu 😄','Noted! 📝 Ada lagi?'];
+  return D[Math.floor(Math.random()*D.length)];
+}
+function kirim(teks){
+  teks=(teks||inp.value||'').trim();if(!teks)return;inp.value='';
+  addBubble(teks.replace(/</g,'&lt;'),true);
+  typing(function(){addBubble(otak(teks),false);},700+Math.random()*700);
+}
+document.getElementById('send').onclick=function(){kirim();};
+inp.addEventListener('keydown',function(e){if(e.key==='Enter')kirim();});
+document.getElementById('klaim').onclick=function(){
+  if(cnt<3){alert('Kirim minimal 3 pesan dulu ya!');return;}
+  var pts=Math.min(100,cnt*4);
+  fetch('/api/wa/score',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:KEY,token:PTOK,game:'bubble',points:pts})})
+    .then(function(r){return r.json();}).then(function(j){alert(j.ok?('Skor +'+j.points+' tercatat di !rank 🎉'):'Gagal: '+(j.error||'?'));})
+    .catch(function(){alert('Gagal kirim skor (buka via !bubble biar token valid).');});
+};
+setTimeout(function(){typing(function(){addBubble('Halo! Selamat datang di <b>Bubble Chat</b> 💬<br>Ketik sesuatu atau ketuk tombol cepat di atas~',false);},700);},500);
+</script>
+</body>
+</html>

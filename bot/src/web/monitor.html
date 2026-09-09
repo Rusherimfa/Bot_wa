@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Server Monitor - WA Bot</title>
+<style>
+:root{--bg:#0b0f17;--card:#151c2b;--line:#263049;--accent:#22d3ee;--green:#34d399;--amber:#fbbf24;--red:#f87171;--ink:#e8eef7;--muted:#8b98b3;--sys:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:radial-gradient(1200px 600px at 50% -10%,#16213a 0%,var(--bg) 60%);color:var(--ink);font-family:var(--sys);min-height:100vh;font-size:14px}
+.wrap{max-width:560px;margin:0 auto;padding:14px 12px 28px}
+.head{display:flex;align-items:center;gap:10px;margin:6px 2px 12px}
+.dot{width:11px;height:11px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:blink 1.6s infinite}
+@keyframes blink{50%{opacity:.4}}
+.head h1{font-size:17px;font-weight:800;letter-spacing:.3px}
+.head small{color:var(--muted);font-size:11px;display:block;font-weight:400}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+.card.full{grid-column:1/-1}
+.card h3{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.big{font-size:22px;font-weight:800}
+.big small{font-size:12px;color:var(--muted);font-weight:400}
+.bar{height:8px;background:#0b1120;border-radius:6px;margin-top:8px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--accent),#818cf8);transition:width .5s}
+.bar.hot i{background:linear-gradient(90deg,var(--amber),var(--red))}
+.sub{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5;word-break:break-word}
+.row{display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px dashed #222c44}
+.row:last-child{border:0}
+.row b{font-weight:700}
+.ok{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}
+.svc{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;margin:2px 3px 2px 0;background:#0b1120;border:1px solid var(--line)}
+.svc.on{color:var(--green);border-color:#14532d}.svc.off{color:var(--red);border-color:#7f1d1d}
+.btnrow{display:flex;gap:8px;margin-top:10px}
+button{flex:1;padding:11px;border:0;border-radius:10px;font-weight:800;font-size:13px;background:var(--accent);color:#04202a;cursor:pointer}
+button.ghost{background:#0b1120;color:var(--accent);border:1px solid var(--line)}
+button:active{transform:scale(.97)}
+#speed{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6}
+.foot{text-align:center;color:var(--muted);font-size:11px;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><div class="dot" id="dot"></div><div><h1>SERVER MONITOR <span id="mode" style="font-size:10px;background:#0b1120;border:1px solid var(--line);border-radius:12px;padding:2px 8px;color:var(--muted)">…</span></h1><small id="host">menghubungkan…</small></div></div>
+  <div class="grid">
+    <div class="card"><h3>CPU</h3><div class="big" id="cpuP">–</div><div class="bar" id="cpuBar"><i style="width:0%"></i></div><div class="sub" id="cpuS">–</div></div>
+    <div class="card"><h3>RAM</h3><div class="big" id="ramP">–</div><div class="bar" id="ramBar"><i style="width:0%"></i></div><div class="sub" id="ramS">–</div></div>
+    <div class="card full"><h3>GPU</h3><div id="gpu">–</div></div>
+    <div class="card"><h3>Disk /</h3><div class="big" id="diskP">–</div><div class="bar" id="diskBar"><i style="width:0%"></i></div><div class="sub" id="diskS">–</div></div>
+    <div class="card"><h3>Network</h3><div class="big" id="netR">–</div><div class="sub" id="netS">–</div></div>
+    <div class="card full"><h3>Speedtest (server ↔ HP ini)</h3>
+      <div class="btnrow"><button id="bSpeed">UKUR KECEPATAN</button><button class="ghost" id="bRef">REFRESH</button></div>
+      <div id="speed">Belum diukur. Tombol di atas download blob dari server buat ukur throughput + latency.</div>
+    </div>
+    <div class="card full"><h3>Services</h3><div id="svc">–</div></div>
+    <div class="card full"><h3>Info</h3><div id="info">–</div></div>
+  </div>
+  <div class="foot">WA Bot Full • auto-refresh 3 detik • <span id="upd">–</span><br><span id="err" style="color:var(--amber)"></span></div>
+</div>
+<script>
+(function(){
+var KEY=(function(){try{return new URLSearchParams(location.search).get('key')||'';}catch(e){return '';}})();
+function api(p){return fetch(p+(p.indexOf('?')<0?'?':'&')+'key='+encodeURIComponent(KEY),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});}
+function fmtB(b){if(b==null||isNaN(b))return'–';var u=['B','KB','MB','GB','TB'],i=0;while(b>=1024&&i<4){b/=1024;i++;}return b.toFixed(b>=100?0:1)+' '+u[i];}
+function fmtT(s){s=Math.floor(s);var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return(d?d+'h ':'')+(h?h+'j ':'')+m+'m';}
+function setBar(id,p){var el=document.getElementById(id);el.firstElementChild.style.width=Math.min(100,Math.max(0,p))+'%';el.classList.toggle('hot',p>=85);}
+var prevNet=null;
+function render(s){
+  document.getElementById('host').textContent=(s.host||'server')+' • up '+fmtT(s.uptime||0)+' • '+(s.cpuModel||'');
+  var cp=s.cpu||{};document.getElementById('cpuP').innerHTML=(cp.usage!=null?cp.usage.toFixed(0):'–')+'<small>% • load '+(cp.load1!=null?cp.load1.toFixed(2):'–')+'</small>';
+  setBar('cpuBar',cp.usage||0);document.getElementById('cpuS').textContent=(s.cpuModel||'')+' • '+(s.cpuCores||'?')+' core';
+  var m=s.mem||{},mp=m.total?m.used/m.total*100:0;
+  document.getElementById('ramP').innerHTML=mp.toFixed(0)+'<small>% • '+fmtB(m.used)+' / '+fmtB(m.total)+'</small>';
+  setBar('ramBar',mp);document.getElementById('ramS').textContent='bebas '+fmtB(m.free)+' • swap '+fmtB((s.swap||{}).free)+' / '+fmtB((s.swap||{}).total);
+  var g='';(s.gpus||[]).forEach(function(x){g+='<div class="row"><span>'+x.name+'</span><b class="'+(x.util!=null&&x.util>=85?'warn':'ok')+'">'+(x.util!=null?x.util+'%':'–')+(x.temp!=null?' • '+x.temp+'°C':'')+(x.memUsed!=null?' • '+fmtB(x.memUsed)+' / '+fmtB(x.memTotal):'')+'</b></div>';});
+  document.getElementById('gpu').innerHTML=g||'tidak terdeteksi';
+  var d=s.disk||{},dp=parseFloat(d.pcent)||0;
+  document.getElementById('diskP').innerHTML=dp+'<small>% • '+fmtB(d.used)+' / '+fmtB(d.size)+'</small>';
+  setBar('diskBar',dp);document.getElementById('diskS').textContent='sisa '+fmtB(d.avail);
+  var n=s.net||{};
+  var rate=null;
+  if(n.rxRate!=null&&n.txRate!=null)rate={rx:n.rxRate,tx:n.txRate};
+  else if(prevNet&&n.rx!=null&&prevNet.rx!=null&&s._dt&&n.rx>=prevNet.rx)rate={rx:(n.rx-prevNet.rx)/s._dt,tx:(n.tx-prevNet.tx)/s._dt};
+  if(rate)document.getElementById('netR').innerHTML='↓ '+fmtB(rate.rx)+'<small>/s</small> ↑ '+fmtB(rate.tx)+'<small>/s</small>';
+  prevNet=n;document.getElementById('netS').textContent=(n.iface||'–')+' • total ↓ '+fmtB(n.rx)+' ↑ '+fmtB(n.tx);
+  var sv='';Object.keys(s.services||{}).forEach(function(k){var on=s.services[k]==='active';sv+='<span class="svc '+(on?'on':'off')+'">'+(on?'● ':'○ ')+k+'</span>';});
+  document.getElementById('svc').innerHTML=sv||'–';
+  var i=s.info||{},rows=[['Node',i.node],['Bot up',fmtT(i.botUp||0)],['WA',i.wa||'–'],['DB',i.db||'–'],['Waktu',i.time||'']];
+  document.getElementById('info').innerHTML=rows.map(function(r){return'<div class="row"><span>'+r[0]+'</span><b>'+r[1]+'</b></div>';}).join('');
+  document.getElementById('upd').textContent=new Date().toLocaleTimeString('id-ID');
+  document.getElementById('dot').style.background=s.services&&s.services['wa-bot']==='active'?'var(--green)':'var(--red)';
+}
+var lastT=0,live=false;
+function setMode(t,err){var m=document.getElementById('mode');m.textContent=t;m.style.color=t==='LIVE'?'var(--green)':'var(--amber)';document.getElementById('err').textContent=err||'';}
+// Snapshot dibake server saat !monitor dikirim — data langsung tampil
+// walau WebView WA memblokir fetch. Fetch live dicoba diam-diam.
+var SNAP=null;try{SNAP=JSON.parse('__SNAPSHOT__');}catch(e){SNAP=null;}
+try{if(SNAP&&SNAP.host){render(SNAP);setMode('SNAPSHOT');}}catch(e){}
+function tick(){api('api/monitor/stats').then(function(s){s._dt=(Date.now()-lastT)/1000||3;lastT=Date.now();render(s);if(!live){live=true;setMode('LIVE','');}}).catch(function(e){if(live){live=false;}setMode(live?'LIVE':'SNAPSHOT',live?'':('live gagal: '+e.message+' • data snapshot'));});}
+document.getElementById('bRef').onclick=tick;
+var NET=null;try{NET=JSON.parse('__NETTEST__');}catch(e){NET=null;}
+function srvText(n){if(!n||n.downMBs==null)return 'internet server: <b>belum terukur</b>';return 'internet server: <b>'+n.downMBs.toFixed(1)+' MB/s</b> ('+(n.bytes/1048576).toFixed(0)+' MB / '+n.secs+' dtk)'+(n.pingMs!=null?' • ping <b>'+n.pingMs.toFixed(0)+' ms</b>':'');}
+document.getElementById('bSpeed').onclick=function(){
+  var out=document.getElementById('speed');
+  out.innerHTML=srvText(NET)+'<br>server ↔ HP ini: mengukur…';
+  api('api/monitor/nettest').then(function(n){NET=n;out.innerHTML=srvText(n)+'<br>server ↔ HP ini: mengukur…';cl();}).catch(function(e){cl('nettest live: '+e.message);});
+  function cl(note){
+    var t0=performance.now(),N=4,done=0,rtts=[];
+    function one(){var a=performance.now();fetch('api/monitor/ping?key='+encodeURIComponent(KEY)+'&t='+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(){rtts.push(performance.now()-a);if(++done<N)setTimeout(one,120);else{var avg=rtts.reduce(function(x,y){return x+y;},0)/rtts.length;dl(avg);};}).catch(function(e){out.innerHTML=srvText(NET)+'<br>server ↔ HP: <b>terblokir WebView</b> ('+e.message+(note?'; '+note:'')+')';});}
+    function dl(avg){var size=2*1024*1024,a=performance.now();fetch('api/monitor/blob?key='+encodeURIComponent(KEY)+'&size='+size,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();}).then(function(b){var dt=(performance.now()-a)/1000,mb=b.byteLength/1048576;out.innerHTML=srvText(NET)+'<br>server ↔ HP: latency <b>'+avg.toFixed(0)+' ms</b> • download <b>'+(mb/dt).toFixed(1)+' MB/s</b>';}).catch(function(e){out.innerHTML=srvText(NET)+'<br>server ↔ HP: latency <b>'+avg.toFixed(0)+' ms</b> • download gagal ('+e.message+')';});}
+    one();
+  }
+};
+tick();setInterval(tick,3000);
+})();
+</script>
+</body>
+</html>

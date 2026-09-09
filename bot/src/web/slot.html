@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Slot - WA Bot Full</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:radial-gradient(500px 340px at 50% -60px,#3a2c12 0%,#100c06 62%);color:#ffe9b0;max-width:430px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:12px 10px;overflow-x:hidden}
+#top{display:flex;gap:8px;width:100%;margin-bottom:8px}
+.pill{flex:1;min-width:0;background:#1d1408;border:1px solid #6b4a1c;border-radius:10px;text-align:center;padding:6px 4px;font-size:11px;color:#b89b5e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill b{display:block;font-size:clamp(13px,4.5vw,16px);color:#ffd75e}
+/* ===== Kabinet emas ===== */
+#cab{--leverw:52px;position:relative;width:100%;max-width:100%;border-radius:22px;padding:14px var(--leverw) 12px 14px;
+background:linear-gradient(160deg,#fff3c4 0%,#f3c94e 18%,#a86e0c 42%,#f7d876 58%,#8a5a00 80%,#e9b93c 100%);
+box-shadow:0 10px 26px #000c,inset 0 2px 3px #fffdf0cc,inset 0 -4px 8px #5e3d00aa}
+#lamps{display:flex;justify-content:center;gap:clamp(8px,3.5vw,14px);padding:2px 0 8px}
+#cab.shake{animation:shake .45s ease}
+@keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-5px) rotate(-.6deg);}40%{transform:translateX(5px) rotate(.6deg);}60%{transform:translateX(-3px);}80%{transform:translateX(3px);}}
+.lamp{width:clamp(24px,8vw,34px);height:clamp(22px,7vw,30px);border-radius:50% 50% 46% 46%;background:radial-gradient(circle at 50% 30%,#7a1f1f,#3d0d0d 70%);border:2px solid #6e3c06;box-shadow:inset 0 -3px 5px #0009;transition:all .15s}
+.lamp.on{background:radial-gradient(circle at 50% 35%,#fff6c0 0%,#ffb300 35%,#ff3d00 75%);box-shadow:0 0 16px 4px #ff9d00}
+.lamp.jp{animation:jl .3s infinite alternate}
+@keyframes jl{to{box-shadow:0 0 26px 8px #ffe45e;background:radial-gradient(circle at 50% 35%,#fff,#ffd75e 60%,#ff9d00)}}
+#mtitle{text-align:center;font-size:clamp(10px,3.4vw,13px);font-weight:900;letter-spacing:.35em;text-indent:.35em;color:#5e3d00;text-shadow:0 1px 0 #ffffff88;margin-bottom:8px;white-space:nowrap}
+#sndbtn{position:absolute;left:10px;top:10px;width:34px;height:34px;border-radius:50%;border:2px solid #6e3c06;background:linear-gradient(#fff3c4,#d4a017);font-size:16px;cursor:pointer;box-shadow:0 2px 4px #0008;z-index:2}
+#sndbtn:active{transform:scale(.92)}
+#windows{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(5px,2vw,8px);background:linear-gradient(#7a5210,#4a3208);border-radius:14px;padding:clamp(6px,2vw,9px);box-shadow:inset 0 3px 10px #000d}
+.cell{background:linear-gradient(#ffffff,#d9d9d9 85%,#f2f2f2);border-radius:8px;font-size:clamp(26px,11vw,42px);text-align:center;padding:.15em 0;line-height:1.3;box-shadow:inset 0 3px 7px #0006;transition:transform .12s;min-width:0;position:relative;overflow:hidden}
+.cell::after{content:'';position:absolute;inset:0;border-radius:8px;background:linear-gradient(rgba(0,0,0,.22),transparent 32%,transparent 68%,rgba(0,0,0,.22));pointer-events:none}
+.cell.spin{filter:blur(2px) brightness(1.12)}
+.cell.land{animation:land .38s ease}
+@keyframes land{0%{transform:scaleY(1.25) scaleX(.92);}45%{transform:scaleY(.88) scaleX(1.06);}70%{transform:scaleY(1.06) scaleX(.98);}100%{transform:none;}}
+.cell.spin{filter:blur(2px) brightness(1.12)}
+.cell.hit{outline:3px solid #ffd75e;box-shadow:0 0 14px #ffd75e,inset 0 3px 7px #0006;transform:scale(1.05)}
+.seven{color:#d21f26;font-weight:900;font-family:'Arial Black',Arial,sans-serif;text-shadow:1px 1px 0 #7a0000}
+#rbtns{display:flex;justify-content:center;gap:clamp(10px,4vw,16px);margin-top:11px}
+.rbtn{width:clamp(46px,14vw,52px);height:34px;border-radius:50%;border:0;cursor:pointer;
+background:radial-gradient(circle at 50% 28%,#ff8a7a 0%,#e02828 45%,#8f0f0f 100%);
+box-shadow:0 4px 0 #5e0808,0 6px 10px #0009,inset 0 2px 3px #ffffff88;color:#fff;font-weight:900;font-size:15px;flex:none;transition:transform .08s,box-shadow .08s}
+.rbtn:active{transform:translateY(3px);box-shadow:0 1px 0 #5e0808}
+.rbtn small{font-size:9px;display:block;font-weight:700}
+#spinplate{margin:11px auto 2px;width:min(78%,260px);text-align:center;font-size:clamp(20px,7.5vw,30px);font-weight:900;letter-spacing:.2em;text-indent:.2em;color:#c81e1e;white-space:nowrap;
+background:linear-gradient(#fff8dc,#f0c94e 60%,#caa02c);border:2px solid #7a5210;border-radius:12px;padding:7px 0;cursor:pointer;
+text-shadow:1px 1px 0 #fff,-1px -1px 0 #7a4a00;box-shadow:0 4px 0 #6e3c06,0 7px 12px #000a;transition:transform .08s,box-shadow .08s}
+#spinplate:active{transform:translateY(3px);box-shadow:0 1px 0 #6e3c06}
+/* ===== Tuas (skala ikut lebar kabinet) ===== */
+#lever{position:absolute;right:2%;top:34%;width:9%;max-width:34px;min-width:24px;aspect-ratio:34/170;cursor:pointer}
+#track{position:absolute;left:32%;top:0;width:36%;height:100%;border-radius:7px;background:linear-gradient(90deg,#3a2606,#8a5f14,#3a2606);box-shadow:inset 0 2px 6px #000}
+#rod{position:absolute;left:41%;top:4%;width:18%;height:56%;border-radius:3px;background:linear-gradient(90deg,#8a8a8a,#e8e8e8,#8a8a8a);transition:top .25s}
+#ball{position:absolute;left:6%;top:-5%;width:88%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ff9a8a,#d21f26 55%,#6e0a0a);box-shadow:0 3px 6px #000a;transition:top .25s}
+#lever.pulled #rod{top:39%}#lever.pulled #ball{top:30%}
+@media (max-width:340px){
+  #cab{--leverw:44px;border-radius:16px}
+  #msg{font-size:12px}
+  #pay{font-size:10.5px}
+  #foot button{font-size:11px;padding:8px 4px}
+  #mtitle{letter-spacing:.2em;text-indent:.2em}
+}
+@media (max-width:280px){
+  #cab{--leverw:38px;padding-top:10px}
+  #rbtns{gap:8px}
+  #spinplate{letter-spacing:.12em;text-indent:.12em}
+}
+#msg{min-height:22px;font-size:13.5px;font-weight:700;margin:9px 0 2px;color:#fff;text-align:center}
+#msg.win{color:#7CFC98}#msg.jp{color:#ffd75e;font-size:16px;animation:jpt .5s infinite alternate}
+@keyframes jpt{to{transform:scale(1.1);text-shadow:0 0 16px #ffd75e}}
+#foot{display:flex;gap:8px;width:100%;margin-top:6px}
+#foot button{flex:1;min-width:0;padding:9px 4px;border-radius:10px;border:1px solid #6b4a1c;background:#221808;color:#ffd75e;font-size:clamp(11px,3.4vw,12.5px);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#pay{width:100%;margin-top:8px;font-size:11.5px;color:#b89b5e;background:#0d090688;border-radius:10px;padding:8px 10px;line-height:1.7}
+#pay b{color:#ffd75e}
+#jpov{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#000c;font-size:clamp(24px,9vw,34px);font-weight:900;color:#ffd75e;z-index:9;text-align:center;animation:jpt .4s infinite alternate;padding:0 12px}
+</style>
+</head>
+<body>
+<div id="top"><div class="pill">KOIN<b id="coins">100</b></div><div class="pill">MENANG<b id="last">0</b></div><div class="pill">TERBAIK<b id="best">0</b></div></div>
+<div id="cab">
+  <button id="sndbtn">🔊</button>
+  <div id="lamps"><div class="lamp" id="l0"></div><div class="lamp" id="l1"></div><div class="lamp" id="l2"></div></div>
+  <div id="mtitle">★ LUCKY SEVEN ★</div>
+  <div id="windows"></div>
+  <div id="rbtns"><button class="rbtn" id="bmin">−<small>BET</small></button><button class="rbtn" id="bmax">★<small>MAX</small></button><button class="rbtn" id="bplus">+<small>BET</small></button></div>
+  <div style="text-align:center;font-size:11px;font-weight:800;letter-spacing:2px;color:#5e3d00;margin-top:6px">TARUHAN: <span id="betval">10</span></div>
+  <div id="spinplate">SPIN</div>
+  <div id="lever"><div id="track"></div><div id="rod"></div><div id="ball"></div></div>
+</div>
+<div id="msg">Tarik tuas / ketuk SPIN!</div>
+<div id="foot"><button id="klaim">🎁 KLAIM SKOR</button><button id="reset">↺ RESET 100</button></div>
+<div id="pay"><b>Tabel bayar</b> (× taruhan): 🍒×2 🍋×3 🔔×5 ⭐×8 💎×15 <span class="seven">7</span>×50<br>1 garis lurus • <span class="seven">7 7 7</span> = <b>JACKPOT</b></div>
+<div id="jpov">🎉<br>JACKPOT!<br><span id="jpval"></span></div>
+<script>
+var KEY=(function(){try{return new URLSearchParams(location.search).get('key')||'';}catch(e){return '';}})();
+var PTOK='__PTOK__';
+var store=(function(){
+  var mem={},L=null,wn={};
+  try{if(typeof localStorage!=='undefined'){localStorage.setItem('__t','1');if(localStorage.getItem('__t')==='1')L=localStorage;localStorage.removeItem('__t');}}catch(e){L=null;}
+  try{var t=JSON.parse(window.name||'{}');if(t&&typeof t==='object')wn=t;}catch(e){}
+  function saveWn(){try{window.name=JSON.stringify(wn);}catch(e){}}
+  return {
+    get:function(k,d){try{if(L){var v=L.getItem('s_'+k);if(v!==null&&v!==undefined)return JSON.parse(v);}}catch(e){}if(wn&&('s_'+k)in wn)return wn['s_'+k];return (k in mem)?mem[k]:d;},
+    set:function(k,v){try{if(L){L.setItem('s_'+k,JSON.stringify(v));return;}}catch(e){}try{wn['s_'+k]=v;saveWn();}catch(e2){mem[k]=v;}}
+  };
+})();
+var SYM=[['🍒',34],['🍋',26],['🔔',17],['⭐',11],['💎',8],['7️⃣',4]];
+var PAY={'🍒':2,'🍋':3,'🔔':5,'⭐':8,'💎':15,'7️⃣':50};
+var LINES=[[0,1,2]];
+var BETS=[5,10,25,50];
+var S={coins:store.get('coins',100),bet:store.get('bet',10),best:store.get('best',0),sound:store.get('sound',1)};
+if(BETS.indexOf(S.bet)<0)S.bet=10;
+function disp(s){return s==='7️⃣'?'<span class="seven">7</span>':s;}
+var grid=document.getElementById('windows'),cells=[],spinning=false;
+for(var i=0;i<3;i++){var d=document.createElement('div');d.className='cell';d.innerHTML=disp('🍒');grid.appendChild(d);cells.push(d);}
+var lamps=[document.getElementById('l0'),document.getElementById('l1'),document.getElementById('l2')];
+var chaseIv=null,chaseIx=0;
+function lampsOff(){lamps.forEach(function(l){l.classList.remove('on');});}
+function lampsChase(){lampsOff();var n=0;chaseIv=setInterval(function(){lampsOff();lamps[n%3].classList.add('on');n++;},150);}
+function lampsStop(){if(chaseIv)clearInterval(chaseIv);chaseIv=null;lampsOff();}
+function lampsJackpot(){lamps.forEach(function(l){l.classList.add('on');l.classList.add('jp');});setTimeout(function(){lamps.forEach(function(l){l.classList.remove('on');l.classList.remove('jp');});},2400);}
+function save(){store.set('coins',S.coins);store.set('bet',S.bet);store.set('best',S.best);store.set('sound',S.sound);}
+function paint(){document.getElementById('coins').textContent=S.coins;document.getElementById('last').textContent=S.last||0;document.getElementById('best').textContent=S.best;document.getElementById('betval').textContent=S.bet;document.getElementById('sndbtn').textContent=S.sound?'🔊':'🔇';}
+document.getElementById('sndbtn').onclick=function(){S.sound=S.sound?0:1;save();paint();if(S.sound)clickSfx();};
+function msg(t,c){var m=document.getElementById('msg');m.textContent=t;m.className=c||'';}
+function rnd(){var r=Math.random()*100,a=0;for(var i=0;i<SYM.length;i++){a+=SYM[i][1];if(r<a)return SYM[i][0];}return '🍒';}
+var AC=null;
+function ac(){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();return AC;}catch(e){return null;}}
+function tone(f,t0,dur,type,vol){try{if(typeof S!=='undefined'&&!S.sound)return;var c=ac();if(!c)return;var o=c.createOscillator(),g=c.createGain();o.type=type||'square';o.frequency.setValueAtTime(f,c.currentTime+t0);g.gain.setValueAtTime(vol||.15,c.currentTime+t0);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+t0+dur);o.connect(g);g.connect(c.destination);o.start(c.currentTime+t0);o.stop(c.currentTime+t0+dur+.03);}catch(e){}}
+function beep(f,t0,dur){tone(f,t0||0,dur||.09,'square',.12);}
+function tickSfx(){tone(1100+Math.random()*500,0,.03,'square',.05);}
+function leverSfx(){tone(170,0,.07,'sawtooth',.18);tone(95,.08,.14,'square',.2);}
+function clickSfx(){tone(600,0,.05,'square',.12);}
+function coinSfx(){var n=[880,1175,1568,2093];for(var i=0;i<n.length;i++)tone(n[i],i*.07,.13,'square',.15);}
+function loseSfx(){tone(320,0,.14,'sawtooth',.1);tone(215,.14,.26,'sawtooth',.1);}
+function jackpotSfx(){var s=[523,659,784,1047,784,1047,1319,1568,2093];for(var i=0;i<s.length;i++)tone(s[i],i*.11,.15,'square',.16);}
+function winJingle(){coinSfx();}
+document.addEventListener('pointerdown',function(){ac();},{once:true});
+function leverPull(pull){document.getElementById('lever').classList.toggle('pulled',!!pull);}
+document.getElementById('bmin').onclick=function(){var i=BETS.indexOf(S.bet);if(i>0){S.bet=BETS[i-1];save();paint();beep(300,0,.06);}};
+document.getElementById('bplus').onclick=function(){var i=BETS.indexOf(S.bet);if(i<BETS.length-1){S.bet=BETS[i+1];save();paint();beep(300,0,.06);}};
+document.getElementById('bmax').onclick=function(){S.bet=BETS[BETS.length-1];save();paint();beep(500,0,.08);};
+function doSpin(){
+  if(spinning)return;
+  if(S.coins<S.bet){msg('Koin kurang — ketuk RESET ↺','');return;}
+  spinning=true;leverPull(true);lampsChase();leverSfx();
+  cells.forEach(function(c){c.classList.remove('hit');c.classList.add('spin');});
+  S.coins-=S.bet;S.last=0;paint();msg('Memutar…','');beep(200,0,.08);
+  var res=[];for(var i=0;i<3;i++)res.push(rnd());
+  // Tiap kolom: cepat di awal, melambat halus (ease-out), lalu mendarat memantul.
+  var durs=[1100,1700,2300],done=0;
+  [0,1,2].forEach(function(col){
+    var t0=Date.now(),step=60;
+    (function tick(){
+      if(Date.now()-t0>=durs[col]){
+        cells[col].innerHTML=disp(res[col]);
+        cells[col].classList.remove('spin');
+        cells[col].classList.add('land');
+        setTimeout(function(){cells[col].classList.remove('land');},400);
+        beep(440+col*120,0,.09);
+        if(++done===3){lampsStop();leverPull(false);finish(res);}
+        return;
+      }
+      cells[col].innerHTML=disp(rnd());
+      tickSfx();
+      step=Math.min(300,step*1.15);
+      setTimeout(tick,step);
+    })();
+  });
+  function finish(g){
+    spinning=false;
+    var total=0,hits=[];
+    LINES.forEach(function(L){
+      var a=g[L[0]];
+      if(a===g[L[1]]&&a===g[L[2]]){total+=PAY[a]*S.bet;hits=hits.concat(L);}
+    });
+    total=Math.round(total);
+    S.last=total;document.getElementById('last').textContent=total;
+    if(total>0){
+      S.coins+=total;if(total>S.best)S.best=total;save();paint();
+      hits.forEach(function(i){cells[i].classList.add('hit');});
+      var cab=document.getElementById('cab');cab.classList.remove('shake');void cab.offsetWidth;cab.classList.add('shake');
+      var jp=(g[0]==='7️⃣'&&g[1]==='7️⃣'&&g[2]==='7️⃣');
+      if(jp){document.getElementById('jpval').textContent='+'+total+' KOIN';document.getElementById('jpov').style.display='flex';lampsJackpot();jackpotSfx();setTimeout(function(){document.getElementById('jpov').style.display='none';},2200);msg('🎉 JACKPOT +'+total+'!','jp');}
+      else{coinSfx();msg('Menang +'+total+' koin!','win');}
+    }else{paint();loseSfx();msg('Belum beruntung, coba lagi!','');}
+  }
+}
+document.getElementById('spinplate').onclick=doSpin;
+document.getElementById('lever').onclick=doSpin;
+document.getElementById('reset').onclick=function(){S.coins=100;save();paint();msg('Koin direset ke 100 ↺','');};
+document.getElementById('klaim').onclick=function(){
+  var pts=Math.min(100,Math.floor(S.coins/20));
+  if(pts<1){alert('Butuh minimal 20 koin buat klaim!');return;}
+  fetch('/api/wa/score',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:KEY,token:PTOK,game:'slot',points:pts})})
+    .then(function(r){return r.json();}).then(function(j){
+      if(j.ok){S.coins-=pts*20;save();paint();coinSfx();alert('Skor +'+j.points+' tercatat di !rank 🎉');}
+      else alert('Gagal: '+(j.error||'?'));
+    }).catch(function(){alert('Gagal kirim skor (buka via !slot biar token valid).');});
+};
+document.getElementById('jpov').onclick=function(){this.style.display='none';};
+paint();
+</script>
+</body>
+</html>

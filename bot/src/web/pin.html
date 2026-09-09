@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pin - WA Bot Full</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:#f4f4f5;color:#111;max-width:480px;margin:0 auto;min-height:100vh}
+.hd{position:sticky;top:0;z-index:5;background:#fffc;display:flex;align-items:center;gap:10px;padding:10px 12px;backdrop-filter:blur(8px);border-bottom:1px solid #e4e4e7}
+.logo{width:34px;height:34px;border-radius:50%;background:#e60023;color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:900;flex:none}
+.hd b{font-size:15px;display:block}.hd small{font-size:11.5px;color:#71717a}
+#shuf{margin-left:auto;flex:none;border:0;background:#111;color:#fff;border-radius:20px;padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer}
+#shuf:active{transform:scale(.94)}
+#gal{columns:2;column-gap:10px;padding:10px}
+@media (min-width:420px){#gal{columns:3}}
+.pin{break-inside:avoid;margin-bottom:10px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 1px 4px #0002;cursor:pointer;transition:transform .12s}
+.pin:active{transform:scale(.97)}
+.pin .im{position:relative;width:100%;background:#e4e4e7;overflow:hidden}
+.pin img{width:100%;display:block;opacity:0;transition:opacity .4s}
+.pin img.ld{opacity:1}
+.pin .im::after{content:'';position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,#ffffff88 50%,transparent 70%);background-size:200% 100%;animation:sh 1.2s infinite}
+.pin.done .im::after{display:none}
+@keyframes sh{from{background-position:180% 0}to{background-position:-80% 0}}
+.pin .cap{padding:8px 10px;font-size:12px;font-weight:600}
+.pin .sty{padding:0 10px 9px;font-size:10.5px;color:#71717a}
+#fs{position:fixed;inset:0;z-index:20;background:#000e;display:none;flex-direction:column;align-items:center;justify-content:center;padding:16px}
+#fs img{max-width:100%;max-height:76vh;border-radius:12px}
+#fs .t{color:#fff;font-size:13px;margin:10px 0;font-weight:600;text-align:center}
+#fs .row{display:flex;gap:10px}
+#fs button{border:0;border-radius:20px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer}
+#fsDl{background:#e60023;color:#fff}
+#fsX{background:#27272a;color:#fff}
+#err{text-align:center;font-size:12px;color:#71717a;padding:14px}
+</style>
+</head>
+<body>
+<div class="hd"><div class="logo">P</div><div><b id="tema">Pin</b><small id="cnt">memuat gambar AI…</small></div><button id="shuf">🔀 ACAK</button></div>
+<div id="gal"></div>
+<div id="err"></div>
+<div id="fs"><img id="fsImg"><div class="t" id="fsT"></div><div class="row"><a id="fsDl" style="text-decoration:none"><button id="fsDlB">⬇ SIMPAN</button></a><button id="fsX">TUTUP</button></div></div>
+<script>
+var TEMA='__TEMA__';
+try{var _q=new URLSearchParams(location.search).get('tema');if(_q)TEMA=decodeURIComponent(_q).slice(0,60);}catch(e){}
+var PINS=[];try{PINS=JSON.parse('__PINS__');}catch(e){PINS=[];}
+var BAKED=PINS.length>0;
+var STY=[['Foto realistis',420,560],['Anime',420,380],['Digital art',420,620],['Lukisan cat air',420,440],['Cyberpunk',420,520],['Vintage',420,400]];
+var gal=document.getElementById('gal');
+document.getElementById('tema').textContent='📌 '+TEMA;
+function pinUrl(prompt,w,h,seed){return 'https://image.pollinations.ai/prompt/'+encodeURIComponent(prompt)+'?width='+w+'&height='+h+'&seed='+seed+'&nologo=true';}
+function makePin(cap,sty,thumb,full){
+  var d=document.createElement('div');d.className='pin';
+  d.innerHTML='<div class="im"><img loading="lazy" alt=""></div><div class="cap"></div><div class="sty"></div>';
+  var img=d.querySelector('img');
+  d.querySelector('.cap').textContent=cap;
+  d.querySelector('.sty').textContent=sty+' • ketuk buat zoom';
+  img.alt=cap;var tries=0;
+  img.onload=function(){d.classList.add('done');img.classList.add('ld');};
+  img.onerror=function(){if(full&&img.src!==full){img.src=full;}else if(++tries<3&&!thumb){img.src=full+'&r='+Math.floor(Math.random()*99999);}else{d.classList.add('done');document.getElementById('err').textContent='Sebagian gambar gagal dimuat, ketuk ACAK buat coba lagi.';}};
+  img.src=thumb||full;
+  d.onclick=function(){openFs(full||thumb,cap,thumb);};
+  return d;
+}
+function openFs(src,cap,thumb){
+  var f=document.getElementById('fsImg');
+  f.onerror=function(){if(thumb&&f.src!==thumb)f.src=thumb;};
+  f.src=src;document.getElementById('fsT').textContent=cap;document.getElementById('fsDl').href=src;document.getElementById('fs').style.display='flex';
+}
+function build(){
+  gal.innerHTML='';document.getElementById('err').textContent='';
+  if(BAKED){
+    var n=0;
+    PINS.forEach(function(p){
+      var d=makePin(p.cap,p.sty,p.thumb,p.full);
+      d.querySelector('img').addEventListener('load',function(){if(++n===PINS.length)document.getElementById('cnt').textContent=n+' pin AI siap ✨';});
+      if(p.thumb&&p.thumb.indexOf('data:')===0){d.classList.add('done');d.querySelector('img').classList.add('ld');if(++n===PINS.length)document.getElementById('cnt').textContent=n+' pin AI siap ✨';}
+      gal.appendChild(d);
+    });
+    document.getElementById('cnt').textContent=PINS.length+' pin AI siap ✨';
+    return;
+  }
+  var n2=0;
+  STY.forEach(function(s,i){
+    var seed=Math.floor(Math.random()*99999);
+    var cap=TEMA+' • '+s[0];
+    var d=makePin(cap,s[0],null,pinUrl(TEMA+', '+s[0],s[1],s[2],seed));
+    d.querySelector('img').addEventListener('load',function(){if(++n2===STY.length)document.getElementById('cnt').textContent=n2+' pin AI siap ✨';});
+    gal.appendChild(d);
+  });
+  document.getElementById('cnt').textContent='memuat 6 pin AI…';
+}
+document.getElementById('shuf').onclick=function(){if(BAKED)PINS.sort(function(){return Math.random()-.5;});build();};
+document.getElementById('fsX').onclick=function(){document.getElementById('fs').style.display='none';document.getElementById('fsImg').src='';};
+document.getElementById('fs').onclick=function(e){if(e.target.id==='fs')this.style.display='none';};
+build();
+</script>
+</body>
+</html>

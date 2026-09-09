@@ -67,19 +67,28 @@ Jawab langsung tanpa prefix. !hint untuk bocoran, !nyerah untuk menyerah.`);
     },
   },
   {
-    name: 'slot', desc: 'Mesin slot koin',
+    name: 'slot', aliases: ['slots', 'mesinslot'], desc: 'Mesin slot 3x3 langsung di chat',
     async run({ jid, sender, pushName, send, sock }) {
-      const { db } = await import('../core/store.js');
-      const em = ['7', 'BAR', 'STAR'];
-      const fin = [pick(em), pick(em), pick(em)];
-      const frames = [`*SLOT*\n[ ? | ? | ? ]\nMemutar...`];
-      for (let i = 0; i < 3; i++)
-        frames.push(`*SLOT*\n[ ${pick(em)} | ${pick(em)} | ${pick(em)} ]\nMemutar...`);
-      const win = fin[0] === fin[1] && fin[1] === fin[2];
-      frames.push(`*SLOT*\n[ ${fin.join(' | ')} ]\n${win ? 'JACKPOT. +50 poin.' : 'Belum beruntung. +5 XP.'}`);
-      await animate(sock, jid, frames, 600);
-      if (win) await db.addScore(sender, 'slot', 50);
-      await db.addXp(sender, pushName, win ? 50 : 5);
+      // Utama: UI bubble (mesin beneran). Gagal → animasi teks lawas.
+      try {
+        const { inlineGame, sendInlineWebUI } = await import('../wa/airich-send.js');
+        const { createPlayToken } = await import('../core/playtoken.js');
+        await sendInlineWebUI(sock, jid, await inlineGame('slot.html', { token: await createPlayToken(sender) }), 'Mesin Slot');
+        await send(jid, 'Mesin slot terkirim di atas 🎰. Atur taruhan, SPIN, klaim koin jadi !rank.');
+        return;
+      } catch (e) {
+        const { db } = await import('../core/store.js');
+        const em = ['7', 'BAR', 'STAR'];
+        const fin = [pick(em), pick(em), pick(em)];
+        const frames = [`*SLOT*\n[ ? | ? | ? ]\nMemutar...`];
+        for (let i = 0; i < 3; i++)
+          frames.push(`*SLOT*\n[ ${pick(em)} | ${pick(em)} | ${pick(em)} ]\nMemutar...`);
+        const win = fin[0] === fin[1] && fin[1] === fin[2];
+        frames.push(`*SLOT*\n[ ${fin.join(' | ')} ]\n${win ? 'JACKPOT. +50 poin.' : 'Belum beruntung. +5 XP.'}`);
+        await animate(sock, jid, frames, 600);
+        if (win) await db.addScore(sender, 'slot', 50);
+        await db.addXp(sender, pushName, win ? 50 : 5);
+      }
     },
   },
   {

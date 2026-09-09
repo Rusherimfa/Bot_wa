@@ -104,6 +104,56 @@ export const media = [
     },
   },
   {
+    name: 'pin', aliases: ['pins', 'pinterest'], desc: '!pin <tema> galeri AI ala Pinterest di chat',
+    async run({ jid, raw, send, sock }) {
+      const tema = (raw || 'pemandangan indah').slice(0, 60);
+      try {
+        const { inlineGame, sendInlineWebUI } = await import('../wa/airich-send.js');
+        const { webBase, config } = await import('../core/config.js');
+        await send(jid, `Menyiapkan galeri *${tema}* 📌 (mengambil foto asli, ~5 detik)…`);
+        // Foto ASLI per kata kunci via LoremFlickr (Pinterest langsung memblokir
+        // server: 403 + dinding login). Thumb ditanam base64 agar pasti tampil.
+        const kw = tema.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).slice(0, 3).join(',') || 'nature';
+        const HS = [560, 380, 620, 440, 520, 400];
+        const jobs = HS.map(async (h, i) => {
+          const lock = Math.floor(Math.random() * 9000) + 1;
+          const full = `https://loremflickr.com/420/${h}/${kw}?lock=${lock}`;
+          const thumbUrl = `https://loremflickr.com/320/${Math.round(h * 320 / 420)}/${kw}?lock=${lock}`;
+          let thumb = null;
+          try {
+            const r = await fetch(thumbUrl, { signal: AbortSignal.timeout(25000), headers: { 'User-Agent': 'Mozilla/5.0' } });
+            if (r.ok) {
+              const buf = Buffer.from(await r.arrayBuffer());
+              if (buf.length > 2000 && buf.length < 400000) thumb = 'data:image/jpeg;base64,' + buf.toString('base64');
+            }
+          } catch {}
+          if (!thumb) {
+            // cadangan: AI bila foto asli gagal
+            try {
+              const r2 = await fetch(`https://image.pollinations.ai/prompt/${encodeURIComponent(tema)}?width=320&height=320&seed=${lock}&nologo=true`, { signal: AbortSignal.timeout(25000) });
+              if (r2.ok) {
+                const b2 = Buffer.from(await r2.arrayBuffer());
+                if (b2.length > 2000 && b2.length < 400000) thumb = 'data:image/jpeg;base64,' + b2.toString('base64');
+              }
+            } catch {}
+          }
+          return { cap: `${tema} • Foto ${i + 1}`, sty: 'Foto asli', thumb, full };
+        });
+        const pins = await Promise.all(jobs);
+        let html = await inlineGame('pin.html', {});
+        html = html.split('__TEMA__').join(tema.replace(/</g, '').replace(/>/g, ''));
+        html = html.split('__PINS__').join(JSON.stringify(pins).replace(/</g, '\\u003c'));
+        const base = (config.webPublic || webBase()).replace(/\/$/, '');
+        await sendInlineWebUI(sock, jid, html, '📌 ' + tema, { trustedSources: [base, 'https://loremflickr.com', 'https://image.pollinations.ai'] });
+        await send(jid, `Galeri *${tema}* terkirim di atas 📌 (foto asli — Pinterest-nya langsung blokir bot, jadi ambil dari Flickr 📷).`);
+      } catch (e) {
+        const { webBase } = await import('../core/config.js');
+        const { config } = await import('../core/config.js');
+        await send(jid, `📌 *${tema}*\nBuka: ${webBase()}/pin?key=${config.panelKey}&tema=${encodeURIComponent(tema)} (inline gagal: ${e.message})`);
+      }
+    },
+  },
+  {
     name: 'spotify', aliases: ['musik', 'lagu', 'play'], desc: '!spotify <judul> [full] kartu preview / full-song-1-kartu',
     async run({ jid, raw, send, sock }) {
       if (!raw) return send(jid, 'Gunakan: !spotify <judul lagu> [full]\nContoh: !spotify kenangan terindah\nFull 1 kartu: !spotify kenangan terindah full\nFull per menit: !spotifyfull <judul> • Full file: !spotifydl <judul>');

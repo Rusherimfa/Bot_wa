@@ -159,6 +159,8 @@ export function startPanel(getCtx) {
   app.get('/catur', webGame('catur.html'));
   app.get('/rpggame', webGame('rpggame.html'));
   app.get('/bubble', webGame('bubble.html'));
+  app.get('/slot', webGame('slot.html'));
+  app.get('/pin', webGame('pin.html'));
   // Monitor: snapshot dibake server + API absolut, agar data tampil
   // walau WebView WA memblokir fetch (dipakai route /monitor & !monitor).
   app.get('/monitor', async (req, res) => {
@@ -320,7 +322,7 @@ export function startPanel(getCtx) {
   });
   // Terima skor dari game web -> masuk !rank. Batas anti-cheat per submit.
   // Identitas via token (otomatis dari chat) atau nomor manual (kompatibel lama).
-  const MAX_SCORE = { snake: 100, kuiz: 100, chess: 40, rpgpvp: 100, rpghtml: 100, bubble: 100 };
+  const MAX_SCORE = { snake: 100, kuiz: 100, chess: 40, rpgpvp: 100, rpghtml: 100, bubble: 100, slot: 100 };
   app.post('/api/wa/score', async (req, res) => {
     const { key, nomor, token, game, points } = req.body || {};
     if (key !== config.panelKey) return res.status(401).json({ error: 'bad key' });

@@ -89,24 +89,26 @@ function render(s){
   document.getElementById('upd').textContent=new Date().toLocaleTimeString('id-ID');
   document.getElementById('dot').style.background=s.services&&s.services['wa-bot']==='active'?'var(--green)':'var(--red)';
 }
-var lastT=0,live=false;
+var lastT=0,live=false,failN=0;
 function setMode(t,err){var m=document.getElementById('mode');m.textContent=t;m.style.color=t==='LIVE'?'var(--green)':'var(--amber)';document.getElementById('err').textContent=err||'';}
 // Snapshot dibake server saat !monitor dikirim — data langsung tampil
-// walau WebView WA memblokir fetch. Fetch live dicoba diam-diam.
+// walau WebView WA memblokir fetch. Fetch live dicoba diam-diam + reload otomatis.
 var SNAP=null;try{SNAP=JSON.parse('__SNAPSHOT__');}catch(e){SNAP=null;}
 try{if(SNAP&&SNAP.host){render(SNAP);setMode('SNAPSHOT');}}catch(e){}
-function tick(){api('api/monitor/stats').then(function(s){s._dt=(Date.now()-lastT)/1000||3;lastT=Date.now();render(s);if(!live){live=true;setMode('LIVE','');}}).catch(function(e){if(live){live=false;}setMode(live?'LIVE':'SNAPSHOT',live?'':('live gagal: '+e.message+' • data snapshot'));});}
+function tick(){api('api/monitor/stats').then(function(s){s._dt=(Date.now()-lastT)/1000||3;lastT=Date.now();render(s);failN=0;if(!live){live=true;setMode('LIVE','');}}).catch(function(e){failN++;if(live&&failN>2){live=false;}setMode(live?'LIVE':'SNAPSHOT',live?'':'⟳ menghubungkan ulang… (coba ke-'+failN+') • data snapshot • '+e.message);});}
+// Fetch + reloading otomatis (maks 3x, jeda 1 detik) sebelum menyerah.
+function apiRetry(p,tries){return new Promise(function(res,rej){var n=0;function go(){api(p).then(res).catch(function(e){n++;if(n<tries)setTimeout(go,1000);else rej(e);});}go();});}
 document.getElementById('bRef').onclick=tick;
 var NET=null;try{NET=JSON.parse('__NETTEST__');}catch(e){NET=null;}
 function srvText(n){if(!n||n.downMBs==null)return 'internet server: <b>belum terukur</b>';return 'internet server: <b>'+n.downMBs.toFixed(1)+' MB/s</b> ('+(n.bytes/1048576).toFixed(0)+' MB / '+n.secs+' dtk)'+(n.pingMs!=null?' • ping <b>'+n.pingMs.toFixed(0)+' ms</b>':'');}
 document.getElementById('bSpeed').onclick=function(){
   var out=document.getElementById('speed');
   out.innerHTML=srvText(NET)+'<br>server ↔ HP ini: mengukur…';
-  api('api/monitor/nettest').then(function(n){NET=n;out.innerHTML=srvText(n)+'<br>server ↔ HP ini: mengukur…';cl();}).catch(function(e){cl('nettest live: '+e.message);});
+  apiRetry('api/monitor/nettest',3).then(function(n){NET=n;out.innerHTML=srvText(n)+'<br>server ↔ HP ini: mengukur…';cl();}).catch(function(e){out.innerHTML=srvText(NET)+'<br>⟳ reload 3x tetap gagal — pakai angka server di atas.<br>';cl('nettest live: '+e.message);});
   function cl(note){
     var t0=performance.now(),N=4,done=0,rtts=[];
     function one(){var a=performance.now();fetch('api/monitor/ping?key='+encodeURIComponent(KEY)+'&t='+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(){rtts.push(performance.now()-a);if(++done<N)setTimeout(one,120);else{var avg=rtts.reduce(function(x,y){return x+y;},0)/rtts.length;dl(avg);};}).catch(function(e){out.innerHTML=srvText(NET)+'<br>server ↔ HP: <b>terblokir WebView</b> ('+e.message+(note?'; '+note:'')+')';});}
-    function dl(avg){var size=2*1024*1024,a=performance.now();fetch('api/monitor/blob?key='+encodeURIComponent(KEY)+'&size='+size,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();}).then(function(b){var dt=(performance.now()-a)/1000,mb=b.byteLength/1048576;out.innerHTML=srvText(NET)+'<br>server ↔ HP: latency <b>'+avg.toFixed(0)+' ms</b> • download <b>'+(mb/dt).toFixed(1)+' MB/s</b>';}).catch(function(e){out.innerHTML=srvText(NET)+'<br>server ↔ HP: latency <b>'+avg.toFixed(0)+' ms</b> • download gagal ('+e.message+')';});}
+    function dl(avg){var size=2*1024*1024,tried=0;function go(){var a=performance.now();fetch('api/monitor/blob?key='+encodeURIComponent(KEY)+'&size='+size,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();}).then(function(b){var dt=(performance.now()-a)/1000,mb=b.byteLength/1048576;out.innerHTML=srvText(NET)+'<br>server ↔ HP: latency <b>'+avg.toFixed(0)+' ms</b> • download <b>'+(mb/dt).toFixed(1)+' MB/s</b>';}).catch(function(e){if(!tried++){out.innerHTML=srvText(NET)+'<br>⟳ download gagal, memuat ulang…';setTimeout(go,1000);}else{out.innerHTML=srvText(NET)+'<br>server ↔ HP: latency <b>'+avg.toFixed(0)+' ms</b> • download gagal ('+e.message+')';}});}go();}
     one();
   }
 };
